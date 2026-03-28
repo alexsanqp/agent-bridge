@@ -31,15 +31,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+      - name: Remove project .npmrc to avoid conflicts
+        run: rm -f .npmrc
       - run: npm ci
       - run: npm run build
-      - name: Publish to npm
-        run: |
-          cat > ~/.npmrc << EOF
-          registry=https://registry.npmjs.org/
-          //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
-          EOF
-          npm publish --access public
+      - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
