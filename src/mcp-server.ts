@@ -29,14 +29,6 @@ export function withLastSeen<T>(
   };
 }
 
-function getArg(flag: string): string | undefined {
-  const index = process.argv.indexOf(flag);
-  if (index === -1 || index + 1 >= process.argv.length) {
-    return undefined;
-  }
-  return process.argv[index + 1];
-}
-
 export async function startMcpServer(agentName: string, bridgeDir: string): Promise<void> {
   const db = openDatabase(bridgeDir);
 
@@ -71,15 +63,3 @@ export async function startMcpServer(agentName: string, bridgeDir: string): Prom
   });
 }
 
-const agentName = getArg('--agent');
-const bridgeDir = getArg('--bridge-dir');
-
-if (!agentName || !bridgeDir) {
-  console.error('Usage: agent-bridge mcp-server --agent <name> --bridge-dir <path>');
-  process.exit(1);
-}
-
-startMcpServer(agentName, bridgeDir).catch((err) => {
-  console.error('MCP server error:', err);
-  process.exit(1);
-});
