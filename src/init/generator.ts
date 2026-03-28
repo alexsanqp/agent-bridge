@@ -48,47 +48,43 @@ export function generateRolePrompt(
   const peers = allAgents.filter((a) => a.name !== agentName);
   const peerList =
     peers.length > 0
-      ? peers.map((p) => `- **${p.name}** (${p.role}, ${p.client})`).join('\n')
+      ? peers.map((p) => `- **${p.name}** — ${p.role} (${p.client})`).join('\n')
       : '- No other agents configured';
 
-  return `# Agent: ${agentName}
-## Role: ${role}
+  return `# Role: ${role.charAt(0).toUpperCase() + role.slice(1)} (${agentName})
 
-You are **${agentName}**, operating in the **${role}** role within a multi-agent collaboration environment.
+You are a ${role} agent working in a peer collaboration environment.
 
-## MCP Tools Available
+## Peer Collaboration Tools
 
-Use these tools (provided via the \`agent-bridge\` MCP server) to collaborate with peer agents:
+You have access to these MCP tools for collaborating with other agents:
 
-| Tool | Purpose |
-|------|---------|
-| \`peer_send\` | Send a task or question to another agent |
-| \`peer_reply\` | Reply to a task assigned to you |
-| \`peer_inbox\` | Check your inbox for pending tasks |
-| \`peer_get_task\` | Get full details of a specific task |
-| \`peer_wait\` | Wait for a reply to a task you sent |
-| \`peer_complete\` | Mark a task as completed |
-| \`peer_cancel\` | Cancel a task you created |
-| \`peer_status\` | Check the status of all agents and tasks |
-
-## Workflow Guidance
-
-1. **Check your inbox** at the start of each session with \`peer_inbox\`.
-2. **Process tasks** by reading the full task with \`peer_get_task\`, then working on it.
-3. **Reply** with your results using \`peer_reply\`.
-4. **Delegate** by sending tasks to peers using \`peer_send\` when appropriate.
-5. **Wait** for responses with \`peer_wait\` when you need input from others.
+- \`peer_send\` — Send a task to another agent
+- \`peer_inbox\` — Check for tasks assigned to you
+- \`peer_get_task\` — Read full task details
+- \`peer_reply\` — Reply to a task
+- \`peer_wait\` — Wait for a reply (blocks until response)
+- \`peer_complete\` — Mark a task done
+- \`peer_cancel\` — Cancel a task
+- \`peer_status\` — Check bridge status
 
 ## Peer Agents
 
 ${peerList}
 
-## Communication Rules
+## Workflow
 
-- Be concise and structured in all messages.
-- Include relevant file paths and code snippets in replies.
-- Use task types appropriately: \`review\`, \`debug\`, \`test\`, \`question\`, \`implement\`.
-- Complete or cancel tasks you own — do not leave them hanging.
+1. When you need help from a peer, use \`peer_send\` to send them a task
+2. Use \`peer_wait\` to block until the response is back
+3. Read the response with \`peer_get_task\`
+4. Apply the results to your work
+5. Mark the task complete with \`peer_complete\`
+
+## Check Inbox
+
+Periodically check \`peer_inbox\` for tasks assigned to you.
+When you receive a task, read it with \`peer_get_task\`, do the work,
+and reply with \`peer_reply\`.
 `;
 }
 
@@ -97,29 +93,30 @@ export function generateAgentsMd(agents: AgentInfo[]): string {
     .map((a) => `| ${a.name} | ${a.role} | ${a.client} |`)
     .join('\n');
 
-  return `# Agents
+  return `# Agent Collaboration Rules
 
-This project uses **Agent Bridge** for multi-agent collaboration.
+## Agents in this project
 
-## Registered Agents
-
-| Name | Role | Client |
-|------|------|--------|
+| Agent | Role | Client |
+|-------|------|--------|
 ${rows}
 
-## Communication Rules
+## Communication Protocol
 
-1. Agents communicate exclusively through the Agent Bridge MCP tools.
-2. Never modify another agent's files directly — send a task instead.
-3. Each task must have a clear summary and expected deliverable.
-4. Reply to tasks promptly with structured results.
-5. Use \`peer_status\` to check system health before complex workflows.
+1. Use \`peer_send\` to create tasks, not free-form messages
+2. Always include a clear \`summary\` — it's what appears in inbox
+3. Attach relevant files as artifacts, don't paste large code blocks in body
+4. Check \`peer_inbox\` at the start of your session and between tasks
+5. Reply to every task assigned to you, even if it's "can't help with this"
+6. Mark tasks \`complete\` when done, don't leave them hanging
 
-## Quick Start
+## Task Types
 
-- Run \`agent-bridge mcp-server --agent <name>\` to start the MCP server for an agent.
-- Each agent should call \`peer_inbox\` at session start to check for pending work.
-- See \`.agents/<agent-name>.md\` for role-specific instructions.
+- \`review\` — code review request
+- \`debug\` — help debugging an issue
+- \`test\` — write or run tests
+- \`question\` — ask for information or opinion
+- \`implement\` — request to implement something
 `;
 }
 
