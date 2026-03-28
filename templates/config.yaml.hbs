@@ -1,0 +1,14 @@
+version: 1
+agents:
+{{#each agents}}
+  - name: "{{name}}"
+    role: "{{role}}"
+    client: "{{client}}"
+{{/each}}
+policies:
+  blocked_patterns:
+{{#each blocked_patterns}}
+    - "{{this}}"
+{{/each}}
+  max_artifact_size_kb: {{max_artifact_size_kb}}
+expiration_minutes: {{expiration_minutes}}

@@ -1,0 +1,26 @@
+# Agent Collaboration Rules
+
+## Agents in this project
+
+| Agent | Role | Client |
+|-------|------|--------|
+{{#each agents}}
+| {{name}} | {{role}} | {{client}} |
+{{/each}}
+
+## Communication Protocol
+
+1. Use `peer_send` to create tasks, not free-form messages
+2. Always include a clear `summary` — it's what appears in inbox
+3. Attach relevant files as artifacts, don't paste large code blocks in body
+4. Check `peer_inbox` at the start of your session and between tasks
+5. Reply to every task assigned to you, even if it's "can't help with this"
+6. Mark tasks `complete` when done, don't leave them hanging
+
+## Task Types
+
+- `review` — code review request
+- `debug` — help debugging an issue
+- `test` — write or run tests
+- `question` — ask for information or opinion
+- `implement` — request to implement something
