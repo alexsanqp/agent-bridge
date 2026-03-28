@@ -92,7 +92,7 @@ program
       } else {
         console.log(`New version available: ${latestVersion}`);
         console.log('');
-        console.log('Update via npm:        npm update -g agent-bridge');
+        console.log('Update via npm:        npm update -g @plus-minus/agent-bridge');
         console.log('Update via curl:       curl -fsSL https://raw.githubusercontent.com/alexsanqp/agent-bridge/main/install/install.sh | bash');
         console.log('Update via PowerShell: irm https://raw.githubusercontent.com/alexsanqp/agent-bridge/main/install/install.ps1 | iex');
       }
@@ -100,7 +100,7 @@ program
       console.error('Failed to check for updates:', (err as Error).message);
       console.log('');
       console.log('Manual update:');
-      console.log('  npm update -g agent-bridge');
+      console.log('  npm update -g @plus-minus/agent-bridge');
     }
   });
 

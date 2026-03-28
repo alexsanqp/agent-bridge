@@ -28,7 +28,7 @@ SQLite WAL mode allows concurrent readers without blocking. Writes are serialize
 ### npm (recommended, all platforms)
 
 ```bash
-npm install -g agent-bridge
+npm install -g @plus-minus/agent-bridge
 ```
 
 ### macOS / Linux (without Node)

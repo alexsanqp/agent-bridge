@@ -1,5 +1,5 @@
 {
-  "name": "agent-bridge",
+  "name": "@plus-minus/agent-bridge",
   "version": "0.1.0",
   "description": "Peer collaboration bridge for AI coding agents",
   "type": "module",
