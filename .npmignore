@@ -1,0 +1,12 @@
+src/
+tests/
+templates/
+docs/
+install/
+.github/
+.gitignore
+.npmrc
+CLAUDE.md
+SPEC.md
+tsconfig.json
+vitest.config.ts
