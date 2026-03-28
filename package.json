@@ -36,7 +36,6 @@
     "@modelcontextprotocol/sdk": "^1.12.1",
     "better-sqlite3": "^11.8.2",
     "commander": "^13.1.0",
-    "handlebars": "^4.7.8",
     "picomatch": "^4.0.2",
     "yaml": "^2.7.1"
   },
