@@ -663,27 +663,14 @@ describe('peer_wait guards and behavior', () => {
     expect(fetched.status).toBe(TaskStatus.Pending);
   });
 
-  it('returns timeout status when no new messages arrive within deadline', async () => {
+  it('returns no new messages when none were added after timestamp', () => {
     const task = createTask(db, makeTaskInput());
     updateTaskStatus(db, task.id, TaskStatus.Active);
 
-    const initialTimestamp = now();
-    const timeoutMs = 500;
-    const deadline = Date.now() + timeoutMs;
-
-    // Simplified poll loop (like peer-wait but with short timeout)
-    let timedOut = true;
-    while (Date.now() < deadline) {
-      const newMessages = getNewMessages(db, task.id, initialTimestamp);
-      if (newMessages.length > 0) {
-        timedOut = false;
-        break;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-
-    expect(timedOut).toBe(true);
-  }, 5000);
+    const afterTimestamp = now();
+    const newMessages = getNewMessages(db, task.id, afterTimestamp);
+    expect(newMessages).toHaveLength(0);
+  });
 
   it('detects new message during wait and returns reply_received', async () => {
     const task = createTask(db, makeTaskInput());
@@ -691,68 +678,34 @@ describe('peer_wait guards and behavior', () => {
 
     const initialTimestamp = now();
 
-    // Schedule a message to be added after 200ms
-    setTimeout(() => {
-      createMessage(db, {
-        task_id: task.id,
-        author: 'agent-b',
-        kind: 'reply',
-        content: 'Here is my review',
-      });
-    }, 200);
+    // Small delay so message timestamp is strictly after initialTimestamp
+    await new Promise((resolve) => setTimeout(resolve, 15));
 
-    const deadline = Date.now() + 3000;
-    let status = 'timeout';
-    let detectedMessages: unknown[] = [];
+    createMessage(db, {
+      task_id: task.id,
+      author: 'agent-b',
+      kind: 'reply',
+      content: 'Here is my review',
+    });
 
-    while (Date.now() < deadline) {
-      const newMessages = getNewMessages(db, task.id, initialTimestamp);
-      if (newMessages.length > 0) {
-        status = 'reply_received';
-        detectedMessages = newMessages;
-        break;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+    const newMessages = getNewMessages(db, task.id, initialTimestamp);
+    expect(newMessages).toHaveLength(1);
+    expect(newMessages[0].content).toBe('Here is my review');
+  });
 
-    expect(status).toBe('reply_received');
-    expect(detectedMessages).toHaveLength(1);
-    expect((detectedMessages[0] as { content: string }).content).toBe('Here is my review');
-  }, 10000);
-
-  it('detects status change during wait', async () => {
+  it('detects status change during wait', () => {
     const task = createTask(db, makeTaskInput());
     updateTaskStatus(db, task.id, TaskStatus.Active);
 
     const initialStatus = TaskStatus.Active;
-    const initialTimestamp = now();
 
-    // Schedule a status change after 200ms
-    setTimeout(() => {
-      updateTaskStatus(db, task.id, TaskStatus.Completed);
-    }, 200);
+    updateTaskStatus(db, task.id, TaskStatus.Completed);
 
-    const deadline = Date.now() + 3000;
-    let status = 'timeout';
-
-    while (Date.now() < deadline) {
-      const newMessages = getNewMessages(db, task.id, initialTimestamp);
-      if (newMessages.length > 0) {
-        status = 'reply_received';
-        break;
-      }
-
-      const currentTask = getTask(db, task.id);
-      if (currentTask && currentTask.status !== initialStatus) {
-        status = 'status_changed';
-        break;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-
-    expect(status).toBe('status_changed');
-  }, 10000);
+    const currentTask = getTask(db, task.id);
+    expect(currentTask).not.toBeNull();
+    expect(currentTask!.status).not.toBe(initialStatus);
+    expect(currentTask!.status).toBe(TaskStatus.Completed);
+  });
 
   it('returns TASK_NOT_FOUND for nonexistent task', () => {
     const fetched = getTask(db, 'ghost-task');
