@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 import { findProjectRoot, resolveBridgeDir, toForwardSlashes } from '../utils/paths.js';
 import { loadConfig } from '../config/loader.js';
 import { openDatabase, closeDatabase } from '../store/database.js';
@@ -124,6 +125,17 @@ function checkBinaryPaths(projectRoot: string, config: BridgeConfig): CheckResul
             message: commandExists ? command : `${command} not found`,
           });
         }
+      } else if (relativePath.endsWith('.toml')) {
+        const commandMatch = content.match(/command\s*=\s*"([^"]+)"/);
+        if (commandMatch) {
+          const command = commandMatch[1];
+          const commandExists = fs.existsSync(command);
+          results.push({
+            name: `Binary path valid (${relativePath})`,
+            passed: commandExists,
+            message: commandExists ? command : `Not found: ${command}`,
+          });
+        }
       }
     } catch {
       // Skip unparseable MCP configs — already flagged by checkMcpConfigs
@@ -131,6 +143,15 @@ function checkBinaryPaths(projectRoot: string, config: BridgeConfig): CheckResul
   }
 
   return results;
+}
+
+function checkBinaryVersion(results: CheckResult[], binaryPath: string): void {
+  try {
+    const output = execSync(`"${binaryPath}" --version`, { encoding: 'utf-8', timeout: 5000 }).trim();
+    results.push({ name: 'Binary version check', passed: true, message: `Version: ${output}` });
+  } catch {
+    results.push({ name: 'Binary version check', passed: false, message: 'Could not determine binary version' });
+  }
 }
 
 export async function runDoctor(): Promise<void> {
@@ -172,6 +193,14 @@ export async function runDoctor(): Promise<void> {
     // 6. Binary paths
     const binaryResults = checkBinaryPaths(projectRoot, configResult.config);
     results.push(...binaryResults);
+
+    // 7. Binary version check
+    for (const br of binaryResults) {
+      if (br.passed) {
+        checkBinaryVersion(results, br.message);
+        break; // only check version once
+      }
+    }
   }
 
   for (const result of results) {

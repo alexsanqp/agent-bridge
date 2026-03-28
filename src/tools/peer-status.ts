@@ -15,6 +15,7 @@ export function register(
   server.tool(
     'peer_status',
     'Get bridge status and agent info including active tasks, pending inbox, and known agents',
+    {},
     async () => {
       try {
         updateLastSeen(db, agentName);

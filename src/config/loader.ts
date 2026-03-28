@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
 import { toForwardSlashes } from '../utils/paths.js';
+import { DEFAULT_BLOCKED_PATTERNS, DEFAULT_MAX_ARTIFACT_SIZE_KB } from '../domain/policies.js';
 
 export interface AgentConfig {
   name: string;
@@ -35,8 +36,8 @@ export function getDefaultConfig(agents: AgentConfig[]): BridgeConfig {
     version: 1,
     agents,
     policies: {
-      blocked_patterns: ['**/.env', '**/*.key', '**/*.pem'],
-      max_artifact_size_kb: 1024,
+      blocked_patterns: [...DEFAULT_BLOCKED_PATTERNS],
+      max_artifact_size_kb: DEFAULT_MAX_ARTIFACT_SIZE_KB,
     },
     expiration_minutes: 30,
   };

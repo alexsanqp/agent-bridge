@@ -17,7 +17,21 @@ import { upsertAgent } from '../store/agents.js';
 import { saveConfig, getDefaultConfig } from '../config/loader.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import readline from 'node:readline';
 import { execFileSync } from 'node:child_process';
+
+async function prompt(question: string, defaultValue: string): Promise<string> {
+  // If not TTY (non-interactive), return default
+  if (!process.stdin.isTTY) return defaultValue;
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(`${question} [${defaultValue}]: `, (answer) => {
+      rl.close();
+      resolve(answer.trim() || defaultValue);
+    });
+  });
+}
 
 function getMcpConfigPath(client: string, projectRoot: string): string {
   switch (client) {
@@ -55,16 +69,30 @@ const GITIGNORE_ENTRIES = [
 ];
 
 function resolveBinaryPath(): string {
+  const isWindows = process.platform === 'win32';
+  const command = isWindows ? 'where' : 'which';
+  const binaryName = isWindows ? 'agent-bridge.exe' : 'agent-bridge';
+
   try {
-    const bin = process.platform === 'win32' ? 'where' : 'which';
-    const result = execFileSync(bin, ['agent-bridge'], { encoding: 'utf-8' })
-      .trim()
-      .split(/\r?\n/)[0];
-    return toForwardSlashes(result);
+    const result = execFileSync(command, [binaryName.replace('.exe', '')], {
+      encoding: 'utf-8',
+    }).trim();
+    // `where` on Windows may return multiple lines, take first
+    const firstLine = result.split(/\r?\n/)[0].trim();
+    return toForwardSlashes(fs.realpathSync(firstLine));
   } catch {
-    // Fallback: resolve through symlinks from process.argv[1]
+    // Fallback: resolve from process.argv
     try {
-      return toForwardSlashes(fs.realpathSync(process.argv[1]));
+      const argv1 = fs.realpathSync(process.argv[1]);
+      // If argv1 is a .js file, look for the binary in the same bin directory
+      if (argv1.endsWith('.js')) {
+        const binDir = path.dirname(argv1);
+        const binaryInBin = path.join(binDir, binaryName);
+        if (fs.existsSync(binaryInBin)) {
+          return toForwardSlashes(fs.realpathSync(binaryInBin));
+        }
+      }
+      return toForwardSlashes(argv1);
     } catch {
       return toForwardSlashes(process.argv[1]);
     }
@@ -113,8 +141,18 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
     }
   }
 
-  if (detectedClients.length === 0 && detect) {
-    console.log('\nNo clients detected. Creating default config only.');
+  // Interactive prompting: customize detected clients or manual entry
+  for (const client of detectedClients) {
+    client.defaultAgentName = await prompt(`Agent name for ${client.name}`, client.defaultAgentName);
+    client.defaultRole = await prompt(`Role for ${client.defaultAgentName}`, client.defaultRole);
+  }
+
+  if (!detect || detectedClients.length === 0) {
+    console.log('No clients detected. Enter agent configuration manually.');
+    const name = await prompt('Agent name', 'agent-1');
+    const role = await prompt('Role (developer/reviewer/tester/architect)', 'developer');
+    const client = await prompt('Client (cursor/claude-code/codex)', 'cursor');
+    detectedClients.push({ name: client, detected: false, reason: 'manual', defaultAgentName: name, defaultRole: role });
   }
 
   // 5. Build agent list from detected clients
@@ -171,8 +209,15 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
   // 10. Generate and write AGENTS.md
   if (agents.length > 0) {
     const agentsMdContent = generateAgentsMd(agents);
-    fs.writeFileSync(path.join(projectRoot, 'AGENTS.md'), agentsMdContent, 'utf-8');
-    console.log('Created: AGENTS.md');
+    const agentsMdPath = path.join(projectRoot, 'AGENTS.md');
+    if (fs.existsSync(agentsMdPath) && !opts.force) {
+      showDiff(agentsMdPath, agentsMdContent);
+      console.log(`Skipped: AGENTS.md (already exists, use --force to overwrite)`);
+    } else {
+      const existed = fs.existsSync(agentsMdPath);
+      fs.writeFileSync(agentsMdPath, agentsMdContent, 'utf-8');
+      console.log(`${existed ? 'Updated' : 'Created'}: AGENTS.md`);
+    }
   }
 
   // 11. Update .gitignore

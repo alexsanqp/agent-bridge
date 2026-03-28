@@ -67,8 +67,7 @@ const migrations: Migration[] = [
 export function runMigrations(db: BetterSqlite3.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
-      version INTEGER PRIMARY KEY,
-      applied_at TEXT NOT NULL
+      version INTEGER PRIMARY KEY
     );
   `);
 
@@ -83,9 +82,8 @@ export function runMigrations(db: BetterSqlite3.Database): void {
     if (migration.version > appliedVersion) {
       db.transaction(() => {
         migration.apply(db);
-        db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)').run(
+        db.prepare('INSERT OR IGNORE INTO schema_version (version) VALUES (?)').run(
           migration.version,
-          new Date().toISOString(),
         );
       })();
     }

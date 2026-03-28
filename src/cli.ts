@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 
+import fs from 'node:fs';
 import { Command } from 'commander';
 
+const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8'));
 const program = new Command();
 
 program
   .name('agent-bridge')
   .description('Peer collaboration bridge for AI coding agents')
-  .version('0.1.0');
+  .version(pkg.version);
 
 program
   .command('init')
@@ -68,18 +70,38 @@ program
   .command('version')
   .description('Print current version')
   .action(() => {
-    console.log('0.1.0');
+    const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8'));
+    console.log(pkg.version);
   });
 
 program
   .command('self-update')
   .description('Check for updates and install latest version')
   .action(async () => {
+    const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8'));
+    const currentVersion = pkg.version;
+    console.log(`Current version: ${currentVersion}`);
     console.log('Checking for updates...');
-    // For V1, just print manual update instructions
-    console.log('To update via npm:  npm update -g agent-bridge');
-    console.log('To update via curl: curl -fsSL https://raw.githubusercontent.com/alexsanqp/agent-bridge/main/install/install.sh | bash');
-    console.log('Current version: 0.1.0');
+    try {
+      const res = await fetch('https://api.github.com/repos/alexsanqp/agent-bridge/releases/latest');
+      if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
+      const data = await res.json() as { tag_name: string };
+      const latestVersion = data.tag_name.replace(/^v/, '');
+      if (latestVersion === currentVersion) {
+        console.log('Already up to date.');
+      } else {
+        console.log(`New version available: ${latestVersion}`);
+        console.log('');
+        console.log('Update via npm:        npm update -g agent-bridge');
+        console.log('Update via curl:       curl -fsSL https://raw.githubusercontent.com/alexsanqp/agent-bridge/main/install/install.sh | bash');
+        console.log('Update via PowerShell: irm https://raw.githubusercontent.com/alexsanqp/agent-bridge/main/install/install.ps1 | iex');
+      }
+    } catch (err) {
+      console.error('Failed to check for updates:', (err as Error).message);
+      console.log('');
+      console.log('Manual update:');
+      console.log('  npm update -g agent-bridge');
+    }
   });
 
 program.parse();

@@ -149,7 +149,7 @@ describe('init with force overwrites configs', () => {
     const config = loadConfig(bridgeDir);
     expect(config.expiration_minutes).toBe(30);
     expect(config.policies.max_artifact_size_kb).toBe(1024);
-    expect(config.policies.blocked_patterns).toContain('**/.env');
+    expect(config.policies.blocked_patterns).toContain('*.env');
   });
 
   it('does not overwrite config.yaml without force', async () => {

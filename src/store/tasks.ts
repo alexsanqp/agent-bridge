@@ -111,11 +111,14 @@ export function updateTaskStatus(
 }
 
 export function getActiveTasks(db: BetterSqlite3.Database): Task[] {
-  return db
+  const rows = db
     .prepare(
       `SELECT * FROM tasks WHERE status NOT IN ('completed', 'failed', 'cancelled', 'expired')`,
     )
     .all() as Task[];
+  return rows
+    .map(row => applyLazyExpiration(db, row))
+    .filter(task => task.status !== TaskStatus.Expired);
 }
 
 export function cleanupTasks(db: BetterSqlite3.Database, hard: boolean): void {

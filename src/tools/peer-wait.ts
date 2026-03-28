@@ -1,9 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type BetterSqlite3 from 'better-sqlite3';
+import { TaskStatus } from '../domain/models.js';
 import { BridgeError } from '../domain/errors.js';
 import { updateLastSeen } from '../store/agents.js';
-import { getTask } from '../store/tasks.js';
+import { getTask, updateTaskStatus } from '../store/tasks.js';
 import { getNewMessages } from '../store/messages.js';
 import { now } from '../utils/time.js';
 
@@ -27,7 +28,7 @@ export function register(
       try {
         updateLastSeen(db, agentName);
 
-        const task = getTask(db, args.task_id);
+        let task = getTask(db, args.task_id);
         if (!task) {
           return {
             content: [
@@ -41,6 +42,14 @@ export function register(
             ],
             isError: true,
           };
+        }
+
+        // Transition to waiting_reply if currently active and caller is sender
+        if (task.status === TaskStatus.Active && task.sender === agentName) {
+          try {
+            updateTaskStatus(db, args.task_id, TaskStatus.WaitingReply);
+            task = getTask(db, args.task_id)!;
+          } catch { /* ignore if transition not valid */ }
         }
 
         const timeoutSeconds = Math.min(args.timeout_seconds ?? 60, 300);
