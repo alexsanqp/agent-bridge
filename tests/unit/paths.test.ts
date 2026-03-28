@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import path from 'node:path';
 import {
   toForwardSlashes,
   normalizePath,
@@ -41,18 +42,18 @@ describe('normalizePath', () => {
 
 describe('findProjectRoot', () => {
   it('finds project root from the agent-bridge directory', () => {
-    const root = findProjectRoot('C:\\DISK_D\\Projects\\MINE\\agent-bridge');
+    const root = findProjectRoot(process.cwd());
     expect(root).toMatch(/agent-bridge$/);
     expect(root).not.toContain('\\');
   });
 
   it('finds project root from a nested subdirectory', () => {
-    const root = findProjectRoot('C:\\DISK_D\\Projects\\MINE\\agent-bridge\\src\\utils');
+    const subdir = path.join(process.cwd(), 'src', 'utils');
+    const root = findProjectRoot(subdir);
     expect(root).toMatch(/agent-bridge$/);
   });
 
   it('defaults to cwd when no marker is found at filesystem root', () => {
-    // When starting from the project dir itself, it should still find it
     const root = findProjectRoot();
     expect(root).not.toContain('\\');
   });
