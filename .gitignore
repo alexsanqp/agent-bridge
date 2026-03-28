@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Agent Bridge runtime data
+.agent-bridge/bridge.db
+.agent-bridge/bridge.db-wal
+.agent-bridge/bridge.db-shm
+.agent-bridge/artifacts/
+.agent-bridge/logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
