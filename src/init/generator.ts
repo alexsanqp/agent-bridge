@@ -123,33 +123,6 @@ ${rows}
 `;
 }
 
-export function generateConfigYaml(
-  agents: AgentInfo[],
-  expMinutes?: number,
-): string {
-  const agentEntries = agents
-    .map(
-      (a) =>
-        `  - name: "${a.name}"\n    role: "${a.role}"\n    client: "${a.client}"`,
-    )
-    .join('\n');
-
-  return `version: 1
-
-agents:
-${agentEntries}
-
-policies:
-  blocked_patterns:
-    - "**/.env"
-    - "**/*.key"
-    - "**/*.pem"
-  max_artifact_size_kb: 512
-
-expiration_minutes: ${expMinutes ?? 30}
-`;
-}
-
 export function writeMcpConfig(
   client: string,
   projectRoot: string,

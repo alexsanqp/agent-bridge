@@ -11,6 +11,7 @@ import { register as registerPeerWait } from './tools/peer-wait.js';
 import { register as registerPeerComplete } from './tools/peer-complete.js';
 import { register as registerPeerCancel } from './tools/peer-cancel.js';
 import { register as registerPeerStatus } from './tools/peer-status.js';
+import { loadConfig } from './config/loader.js';
 
 export type ToolCallback<T> = (args: T) => Promise<{ content: Array<{ type: string; text: string }> }>;
 
@@ -32,7 +33,11 @@ export function withLastSeen<T>(
 export async function startMcpServer(agentName: string, bridgeDir: string): Promise<void> {
   const db = openDatabase(bridgeDir);
 
-  upsertAgent(db, { name: agentName, role: 'agent', client: 'unknown' });
+  const config = loadConfig(bridgeDir);
+  const agentConfig = config.agents.find(a => a.name === agentName);
+  const role = agentConfig?.role ?? 'agent';
+  const client = agentConfig?.client ?? 'unknown';
+  upsertAgent(db, { name: agentName, role, client });
 
   const server = new McpServer({ name: 'agent-bridge', version: '0.1.0' });
 

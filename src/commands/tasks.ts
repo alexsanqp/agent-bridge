@@ -1,6 +1,6 @@
 import { findProjectRoot, resolveBridgeDir } from '../utils/paths.js';
 import { openDatabase, closeDatabase } from '../store/database.js';
-import { getActiveTasks } from '../store/tasks.js';
+import { getActiveTasks, getTask } from '../store/tasks.js';
 import { getTasksByReceiver } from '../store/tasks.js';
 import type { Task } from '../domain/models.js';
 import { TaskStatus } from '../domain/models.js';
@@ -24,6 +24,11 @@ export async function runTasks(opts: { status?: string; agent?: string }): Promi
     } else {
       tasks = getActiveTasks(db);
     }
+
+    // Apply lazy expiration to all tasks
+    tasks = tasks
+      .map((t) => getTask(db, t.id))
+      .filter((t): t is Task => t !== null);
 
     if (tasks.length === 0) {
       console.log('No tasks found.');

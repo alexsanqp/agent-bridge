@@ -64,4 +64,22 @@ program
     await startMcpServer(opts.agent, opts.bridgeDir);
   });
 
+program
+  .command('version')
+  .description('Print current version')
+  .action(() => {
+    console.log('0.1.0');
+  });
+
+program
+  .command('self-update')
+  .description('Check for updates and install latest version')
+  .action(async () => {
+    console.log('Checking for updates...');
+    // For V1, just print manual update instructions
+    console.log('To update via npm:  npm update -g agent-bridge');
+    console.log('To update via curl: curl -fsSL https://raw.githubusercontent.com/alexsanqp/agent-bridge/main/install/install.sh | bash');
+    console.log('Current version: 0.1.0');
+  });
+
 program.parse();

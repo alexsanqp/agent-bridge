@@ -36,7 +36,7 @@ export function getDefaultConfig(agents: AgentConfig[]): BridgeConfig {
     agents,
     policies: {
       blocked_patterns: ['**/.env', '**/*.key', '**/*.pem'],
-      max_artifact_size_kb: 512,
+      max_artifact_size_kb: 1024,
     },
     expiration_minutes: 30,
   };

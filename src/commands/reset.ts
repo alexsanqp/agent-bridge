@@ -36,4 +36,13 @@ export async function runReset(opts: { hard?: boolean }): Promise<void> {
   } finally {
     closeDatabase(db);
   }
+
+  if (opts.hard) {
+    const dbPath = path.join(bridgeDir, 'bridge.db');
+    for (const suffix of ['', '-wal', '-shm']) {
+      const p = dbPath + suffix;
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
+    console.log('Deleted bridge database files.');
+  }
 }

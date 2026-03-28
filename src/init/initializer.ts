@@ -9,7 +9,6 @@ import {
   generateMcpConfig,
   generateRolePrompt,
   generateAgentsMd,
-  generateConfigYaml,
   writeMcpConfig,
   writeRolePrompt,
 } from './generator.js';
@@ -19,6 +18,32 @@ import { saveConfig, getDefaultConfig } from '../config/loader.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+
+function getMcpConfigPath(client: string, projectRoot: string): string {
+  switch (client) {
+    case 'cursor':
+      return path.join(projectRoot, '.cursor', 'mcp.json');
+    case 'claude-code':
+      return path.join(projectRoot, '.mcp.json');
+    case 'codex':
+      return path.join(projectRoot, '.codex', 'config.toml');
+    default:
+      throw new Error(`Unknown client: ${client}`);
+  }
+}
+
+function showDiff(filePath: string, newContent: string): boolean {
+  if (!fs.existsSync(filePath)) return false;
+  const oldContent = fs.readFileSync(filePath, 'utf-8');
+  if (oldContent === newContent) {
+    console.log(`Unchanged: ${filePath}`);
+    return false;
+  }
+  console.log(`Changed: ${filePath}`);
+  console.log(`  - Old: ${oldContent.length} bytes`);
+  console.log(`  + New: ${newContent.length} bytes`);
+  return true;
+}
 
 const GITIGNORE_ENTRIES = [
   '# Agent Bridge runtime data',
@@ -105,8 +130,8 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
 
   // 7. Generate and write config.yaml
   const configPath = path.join(bridgeDir, 'config.yaml');
+  const config = getDefaultConfig(agents);
   if (!fs.existsSync(configPath) || opts.force) {
-    const config = getDefaultConfig(agents);
     saveConfig(bridgeDir, config);
     console.log(`Created: ${toForwardSlashes(configPath)}`);
   } else {
@@ -121,15 +146,26 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
       client.defaultAgentName,
       bridgeDir,
     );
+    const mcpTargetPath = getMcpConfigPath(client.name, projectRoot);
+    const mcpExists = fs.existsSync(mcpTargetPath);
+    if (mcpExists) {
+      showDiff(mcpTargetPath, mcpContent);
+    }
     writeMcpConfig(client.name, projectRoot, mcpContent);
-    console.log(`Created MCP config for: ${client.name}`);
+    console.log(`${mcpExists ? 'Updated' : 'Created'} MCP config for: ${client.name}`);
   }
 
   // 9. Generate and write role prompts
   for (const agent of agents) {
     const roleContent = generateRolePrompt(agent.name, agent.role, agents);
-    writeRolePrompt(projectRoot, agent.name, roleContent);
-    console.log(`Created role prompt: .agents/${agent.name}.md`);
+    const promptPath = path.join(projectRoot, '.agents', `${agent.name}.md`);
+    if (fs.existsSync(promptPath) && !opts.force) {
+      console.log(`Skipped: ${promptPath} (already exists, use --force to overwrite)`);
+    } else {
+      const existed = fs.existsSync(promptPath);
+      writeRolePrompt(projectRoot, agent.name, roleContent);
+      console.log(`${existed ? 'Updated' : 'Created'} role prompt: .agents/${agent.name}.md`);
+    }
   }
 
   // 10. Generate and write AGENTS.md

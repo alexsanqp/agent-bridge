@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type BetterSqlite3 from 'better-sqlite3';
 import { TaskStatus } from '../domain/models.js';
+import { isTerminal } from '../domain/status.js';
 import { BridgeError } from '../domain/errors.js';
 import { updateLastSeen, getAgent, getAgents } from '../store/agents.js';
 import { getActiveTasks, getTasksByReceiver } from '../store/tasks.js';
@@ -19,7 +20,8 @@ export function register(
         updateLastSeen(db, agentName);
 
         const activeTasks = getActiveTasks(db);
-        const pendingInbox = getTasksByReceiver(db, agentName, TaskStatus.Pending);
+        const allInbox = getTasksByReceiver(db, agentName);
+        const pendingInbox = allInbox.filter((t) => !isTerminal(t.status as TaskStatus));
         const agents = getAgents(db);
         const self = getAgent(db, agentName);
 

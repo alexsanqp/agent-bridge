@@ -3,7 +3,6 @@ import { z } from 'zod';
 import type BetterSqlite3 from 'better-sqlite3';
 import { TaskStatus } from '../domain/models.js';
 import { BridgeError } from '../domain/errors.js';
-import { isTerminal } from '../domain/status.js';
 import { updateLastSeen } from '../store/agents.js';
 import { getTask, updateTaskStatus } from '../store/tasks.js';
 
@@ -47,21 +46,6 @@ export function register(
                 text: JSON.stringify({
                   error: 'NOT_PARTICIPANT',
                   message: `Agent '${agentName}' is not a participant of task '${args.task_id}'`,
-                }),
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        if (isTerminal(task.status)) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify({
-                  error: 'TASK_CLOSED',
-                  message: `Task '${args.task_id}' is already in terminal status '${task.status}'`,
                 }),
               },
             ],

@@ -148,7 +148,7 @@ describe('init with force overwrites configs', () => {
     const bridgeDir = path.join(tmpDir, '.agent-bridge');
     const config = loadConfig(bridgeDir);
     expect(config.expiration_minutes).toBe(30);
-    expect(config.policies.max_artifact_size_kb).toBe(512);
+    expect(config.policies.max_artifact_size_kb).toBe(1024);
     expect(config.policies.blocked_patterns).toContain('**/.env');
   });
 

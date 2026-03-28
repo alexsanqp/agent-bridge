@@ -8,6 +8,7 @@ import { updateLastSeen } from '../store/agents.js';
 import { getTask, updateTaskStatus } from '../store/tasks.js';
 import { createMessage } from '../store/messages.js';
 import { copyArtifact } from '../store/artifacts.js';
+import { loadConfig } from '../config/loader.js';
 
 export function register(
   server: McpServer,
@@ -85,10 +86,15 @@ export function register(
         });
 
         const projectRoot = bridgeDir.replace(/[\\/]\.agent-bridge$/, '');
+        const config = loadConfig(bridgeDir);
+        const policies = {
+          blockedPatterns: config.policies.blocked_patterns,
+          maxArtifactSizeKb: config.policies.max_artifact_size_kb,
+        };
 
         if (args.artifacts) {
           for (const artifactPath of args.artifacts) {
-            copyArtifact(db, artifactPath, args.task_id, message.id, bridgeDir, projectRoot);
+            copyArtifact(db, artifactPath, args.task_id, message.id, bridgeDir, projectRoot, policies);
           }
         }
 
