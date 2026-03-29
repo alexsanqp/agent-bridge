@@ -133,57 +133,67 @@ export async function runInit(opts: { force?: boolean; detect?: boolean; mode?: 
   const binaryPath = resolveBinaryPath();
   console.log(`Binary path: ${binaryPath}`);
 
-  // 4. Detect clients
-  const clients = detect ? detectClients(projectRoot) : [];
-  const detectedClients = clients.filter((c) => c.detected);
+  // 4. Resolve agents: from existing config (re-init) or fresh detection
+  interface AgentEntry { name: string; role: string; client: string; enabled: boolean; }
+  const configPath = path.join(bridgeDir, 'config.yaml');
+  let agents: AgentEntry[];
 
-  if (detect) {
-    console.log('\nDetected clients:');
-    for (const client of clients) {
-      const marker = client.detected ? '[x]' : '[ ]';
-      console.log(`  ${marker} ${client.name} — ${client.reason}`);
+  if (fs.existsSync(configPath) && !opts.force) {
+    // Re-init: use agents from existing config (preserves enabled/disabled, roles)
+    try {
+      const existingConfig = loadConfig(bridgeDir);
+      agents = existingConfig.agents.map((a) => ({
+        ...a,
+        enabled: a.enabled !== false, // backward compat: missing field = enabled
+      }));
+      console.log(`\nUsing agents from existing config.yaml:`);
+      for (const agent of agents) {
+        const marker = agent.enabled ? '[x]' : '[ ]';
+        console.log(`  ${marker} ${agent.name} (${agent.role}) — ${agent.client}`);
+      }
+    } catch {
+      agents = [];
+    }
+  } else {
+    // Fresh init: detect clients and prompt
+    const clients = detect ? detectClients(projectRoot) : [];
+    const detectedClients = clients.filter((c) => c.detected);
+
+    if (detect) {
+      console.log('\nDetected clients:');
+      for (const client of clients) {
+        const marker = client.detected ? '[x]' : '[ ]';
+        console.log(`  ${marker} ${client.name} — ${client.reason}`);
+      }
+    }
+
+    agents = [];
+    for (const client of detectedClients) {
+      const enable = await prompt(`Enable ${client.name}?`, 'Y');
+      const enabled = !(enable.toLowerCase() === 'n' || enable.toLowerCase() === 'no');
+      const agentName = await prompt(`Agent name for ${client.name}`, client.defaultAgentName);
+      const role = await prompt(`Role for ${agentName} (developer/reviewer/tester/architect/etc)`, 'developer');
+      agents.push({ name: agentName, role, client: client.name, enabled });
+      if (!enabled) console.log(`  Disabled: ${client.name} (can enable later in config.yaml)`);
+    }
+
+    if (!detect || detectedClients.length === 0) {
+      console.log('No clients detected. Enter agent configuration manually.');
+      const name = await prompt('Agent name', 'agent-1');
+      const role = await prompt('Role (developer/reviewer/tester/architect/etc)', 'developer');
+      const client = await prompt('Client (cursor/claude-code/codex)', 'cursor');
+      agents.push({ name, role, client, enabled: true });
     }
   }
 
-  // Interactive prompting: confirm, name, and assign roles
-  const agentRoles: Map<string, string> = new Map();
-  const confirmedClients = [];
-  for (const client of detectedClients) {
-    const use = await prompt(`Use ${client.name}?`, 'Y');
-    if (use.toLowerCase() === 'n' || use.toLowerCase() === 'no') {
-      console.log(`  Skipped: ${client.name}`);
-      continue;
-    }
-    client.defaultAgentName = await prompt(`Agent name for ${client.name}`, client.defaultAgentName);
-    const role = await prompt(`Role for ${client.defaultAgentName} (developer/reviewer/tester/architect/etc)`, 'developer');
-    agentRoles.set(client.defaultAgentName, role);
-    confirmedClients.push(client);
-  }
-  detectedClients.length = 0;
-  detectedClients.push(...confirmedClients);
-
-  if (!detect || detectedClients.length === 0) {
-    console.log('No clients detected. Enter agent configuration manually.');
-    const name = await prompt('Agent name', 'agent-1');
-    const role = await prompt('Role (developer/reviewer/tester/architect/etc)', 'developer');
-    const client = await prompt('Client (cursor/claude-code/codex)', 'cursor');
-    detectedClients.push({ name: client, detected: false, reason: 'manual', defaultAgentName: name });
-    agentRoles.set(name, role);
-  }
-
-  // 5. Build agent list from detected clients
-  const agents = detectedClients.map((c) => ({
-    name: c.defaultAgentName,
-    role: agentRoles.get(c.defaultAgentName) ?? 'developer',
-    client: c.name,
-  }));
+  // 5. Separate enabled agents
+  const enabledAgents = agents.filter((a) => a.enabled);
 
   // 6. Create .agent-bridge/ directory
   ensureDir(bridgeDir);
   console.log(`\nCreated: ${bridgeDir}/`);
 
   // 7. Generate and write config.yaml (preserve autonomy mode on re-init)
-  const configPath = path.join(bridgeDir, 'config.yaml');
   let mode: 'manual' | 'autonomous' = 'manual';
 
   // Priority: CLI --mode flag > existing config > default
@@ -205,24 +215,19 @@ export async function runInit(opts: { force?: boolean; detect?: boolean; mode?: 
     console.log(`Skipped: ${toForwardSlashes(configPath)} (already exists, use --force to overwrite)`);
   }
 
-  // 8. Generate and write MCP configs for each detected client
-  for (const client of detectedClients) {
-    const mcpContent = generateMcpConfig(
-      client.name,
-      binaryPath,
-      client.defaultAgentName,
-      bridgeDir,
-    );
-    const mcpTargetPath = getMcpConfigPath(client.name, projectRoot);
+  // 8. Generate MCP configs only for ENABLED agents
+  for (const agent of enabledAgents) {
+    const mcpContent = generateMcpConfig(agent.client, binaryPath, agent.name, bridgeDir);
+    const mcpTargetPath = getMcpConfigPath(agent.client, projectRoot);
     const mcpExists = fs.existsSync(mcpTargetPath);
     if (mcpExists) {
       showDiff(mcpTargetPath, mcpContent);
     }
-    writeMcpConfig(client.name, projectRoot, mcpContent);
-    console.log(`${mcpExists ? 'Updated' : 'Created'} MCP config for: ${client.name}`);
+    writeMcpConfig(agent.client, projectRoot, mcpContent);
+    console.log(`${mcpExists ? 'Updated' : 'Created'} MCP config for: ${agent.client}`);
   }
 
-  // 9. Generate and write unified skill to .agents/skills/ and .claude/skills/
+  // 9. Generate and write unified skill (includes ALL agents in peer list)
   const skillContent = generateSkill(agents, mode);
   writeSkill(projectRoot, skillContent);
   console.log('Created: .agents/skills/peer-collaborate/SKILL.md');
@@ -239,7 +244,7 @@ export async function runInit(opts: { force?: boolean; detect?: boolean; mode?: 
     console.log('Removed legacy: .cursor/rules/agent-bridge.mdc');
   }
 
-  // 12. Generate and write AGENTS.md (Codex reads this natively)
+  // 12. Generate AGENTS.md with ALL agents (enabled and disabled)
   if (agents.length > 0) {
     const agentsMdContent = generateAgentsMd(agents, mode);
     const agentsMdPath = path.join(projectRoot, 'AGENTS.md');
@@ -260,18 +265,25 @@ export async function runInit(opts: { force?: boolean; detect?: boolean; mode?: 
   // 14. Open database (creates schema)
   const db = openDatabase(bridgeDir);
 
-  // 15. Register agents in DB
-  for (const agent of agents) {
+  // 15. Register only ENABLED agents in DB
+  for (const agent of enabledAgents) {
     upsertAgent(db, agent);
     console.log(`Registered agent: ${agent.name} (${agent.role})`);
+  }
+  for (const agent of agents.filter((a) => !a.enabled)) {
+    console.log(`Skipped agent: ${agent.name} (disabled)`);
   }
 
   // 16. Close database
   closeDatabase(db);
 
   // 17. Summary
+  const enabledNames = enabledAgents.map((a) => a.name);
+  const disabledNames = agents.filter((a) => !a.enabled).map((a) => a.name);
   console.log('\n--- Init complete ---');
   console.log(`  Bridge dir: ${bridgeDir}`);
-  console.log(`  Agents: ${agents.length > 0 ? agents.map((a) => a.name).join(', ') : '(none)'}`);
-  console.log(`  Clients: ${detectedClients.length > 0 ? detectedClients.map((c) => c.name).join(', ') : '(none)'}`);
+  console.log(`  Enabled: ${enabledNames.length > 0 ? enabledNames.join(', ') : '(none)'}`);
+  if (disabledNames.length > 0) {
+    console.log(`  Disabled: ${disabledNames.join(', ')} (enable in config.yaml)`);
+  }
 }

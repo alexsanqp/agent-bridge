@@ -8,6 +8,7 @@ export interface AgentConfig {
   name: string;
   role: string;
   client: string;
+  enabled: boolean;
 }
 
 export interface BridgeConfig {

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0] - 2026-03-29
+
+### Added
+- Unified SKILL.md replacing scattered prompt files — one skill for all clients
+- Skills placed in `.agents/skills/` (Cursor + Codex) and `.claude/skills/` (Claude Code)
+- Agent `enabled: true/false` flag in config.yaml — disable clients without removing them
+- Re-init reads existing config.yaml to preserve agent settings (enabled, roles, names)
+- Client confirmation prompt during first init: "Enable cursor? [Y/n]"
+- CLAUDE.md now gets a minimal pointer to skill file instead of full instructions
+- Legacy `.cursor/rules/agent-bridge.mdc` cleaned up automatically on re-init
+
+### Changed
+- Agent identity discovered via `peer_status` instead of hardcoded in prompts
+- Init without `--force` reuses existing config agents instead of re-detecting
+
 ## [0.2.0] - 2026-03-29
 
 ### Added
