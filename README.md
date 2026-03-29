@@ -213,7 +213,6 @@ See [Tools Reference](docs/tools-reference.md) for full parameter details and er
 
 ## Documentation
 
-- [Technical Specification](SPEC.md) -- full architecture, data model, API reference
 - [Setup Guide](docs/setup-guide.md) -- detailed installation and configuration
 - [Tools Reference](docs/tools-reference.md) -- MCP tools parameter details and examples
 - [Architecture](docs/architecture.md) -- design decisions and internals
@@ -245,7 +244,7 @@ npm run lint
 
 ## Status
 
-V1 in development. See [SPEC.md](SPEC.md) for the full specification.
+V1 in development.
 
 ## License
 
