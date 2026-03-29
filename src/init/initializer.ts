@@ -145,13 +145,22 @@ export async function runInit(opts: { force?: boolean; detect?: boolean; mode?: 
     }
   }
 
-  // Interactive prompting: customize detected clients or manual entry
+  // Interactive prompting: confirm, name, and assign roles
   const agentRoles: Map<string, string> = new Map();
+  const confirmedClients = [];
   for (const client of detectedClients) {
+    const use = await prompt(`Use ${client.name}?`, 'Y');
+    if (use.toLowerCase() === 'n' || use.toLowerCase() === 'no') {
+      console.log(`  Skipped: ${client.name}`);
+      continue;
+    }
     client.defaultAgentName = await prompt(`Agent name for ${client.name}`, client.defaultAgentName);
     const role = await prompt(`Role for ${client.defaultAgentName} (developer/reviewer/tester/architect/etc)`, 'developer');
     agentRoles.set(client.defaultAgentName, role);
+    confirmedClients.push(client);
   }
+  detectedClients.length = 0;
+  detectedClients.push(...confirmedClients);
 
   if (!detect || detectedClients.length === 0) {
     console.log('No clients detected. Enter agent configuration manually.');
