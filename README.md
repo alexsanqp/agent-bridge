@@ -1,7 +1,7 @@
 # Agent Bridge
 
-Peer collaboration bridge for AI coding agents.
-Allows Cursor, Claude Code, and Codex CLI to exchange tasks, messages, and artifacts within a shared project.
+A shared task bus for coding agents.
+Make Cursor, Claude Code, and Codex work together in one repo through a shared local SQLite workspace — no daemon, no HTTP server, no ports.
 
 ## How It Works
 
