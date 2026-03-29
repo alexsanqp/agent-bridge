@@ -170,23 +170,25 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
   ensureDir(bridgeDir);
   console.log(`\nCreated: ${bridgeDir}/`);
 
-  // 7. Generate and write config.yaml
+  // 7. Generate and write config.yaml (preserve autonomy mode on re-init)
   const configPath = path.join(bridgeDir, 'config.yaml');
+  let mode: 'manual' | 'autonomous' = 'manual';
+
+  // Read existing config before overwriting to preserve user settings
+  if (fs.existsSync(configPath)) {
+    try {
+      const existingConfig = loadConfig(bridgeDir);
+      mode = existingConfig?.autonomy?.mode ?? 'manual';
+    } catch { /* ignore parse errors */ }
+  }
+
   const config = getDefaultConfig(agents);
+  config.autonomy.mode = mode; // preserve existing mode
   if (!fs.existsSync(configPath) || opts.force) {
     saveConfig(bridgeDir, config);
     console.log(`Created: ${toForwardSlashes(configPath)}`);
   } else {
     console.log(`Skipped: ${toForwardSlashes(configPath)} (already exists, use --force to overwrite)`);
-  }
-
-  // 7b. Resolve autonomy mode from config
-  let mode: 'manual' | 'autonomous' = 'manual';
-  try {
-    const loadedConfig = loadConfig(bridgeDir);
-    mode = loadedConfig?.autonomy?.mode ?? 'manual';
-  } catch {
-    // Config may not exist yet on first init; default to manual
   }
 
   // 8. Generate and write MCP configs for each detected client
