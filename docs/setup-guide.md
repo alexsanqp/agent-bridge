@@ -45,7 +45,12 @@ The CLI scans for known client config directories to determine which AI editors 
 - **Claude Code:** checks for Claude Code indicators
 - **Codex CLI:** checks for `.codex/` directory
 
-Skip detection with `--no-detect` to enter agents manually.
+Skip detection with `--no-detect` to enter agents manually. Set the collaboration mode with `--mode`:
+
+```bash
+agent-bridge init --mode autonomous    # autonomous mode from the start
+agent-bridge init --mode manual        # explicit manual (default)
+```
 
 ### 2. Agent naming
 
@@ -96,11 +101,19 @@ autonomy:
 
 ### Switching modes
 
-1. Edit `.agent-bridge/config.yaml` and change `autonomy.mode` to `manual` or `autonomous`
-2. Run `agent-bridge init` to regenerate instruction files with the new workflow instructions
-3. Restart your AI client sessions so they pick up the updated instructions
+**Option 1 — during init:**
 
-The init command preserves the autonomy mode from the existing config when re-running, so you will not lose your setting unless you use `--force` on a fresh config.
+```bash
+agent-bridge init --force --mode autonomous
+```
+
+**Option 2 — edit config:**
+
+1. Edit `.agent-bridge/config.yaml` and change `autonomy.mode` to `manual` or `autonomous`
+2. Run `agent-bridge init --force` to regenerate instruction files
+3. Restart your AI client sessions
+
+The `--mode` flag takes priority over the existing config. Without `--mode`, init preserves the current setting.
 
 ## Verify the setup
 

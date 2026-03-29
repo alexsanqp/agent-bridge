@@ -80,7 +80,14 @@ autonomy:
 
 **Autonomous mode:** Agents proactively check their inbox on session start and poll for responses using `peer_check`. They process incoming tasks without waiting for user instructions. This is the recommended mode for multi-agent workflows where agents run in separate editor windows.
 
-To switch modes, edit `.agent-bridge/config.yaml` and run `agent-bridge init` again to regenerate instruction files. The init command preserves your mode setting across re-runs.
+Set the mode during init with `--mode`:
+
+```bash
+agent-bridge init --mode autonomous
+agent-bridge init --mode manual        # default
+```
+
+Or edit `.agent-bridge/config.yaml` and run `agent-bridge init --force` to regenerate instruction files. The init command preserves your mode setting across re-runs.
 
 ## Usage
 
@@ -142,6 +149,7 @@ After editing, run `agent-bridge init --force` to regenerate instruction files w
 | `agent-bridge init` | Set up project bridge structure, detect clients, generate MCP configs and role prompts |
 | `agent-bridge init --force` | Overwrite existing configs |
 | `agent-bridge init --no-detect` | Skip client auto-detection, prompt for all |
+| `agent-bridge init --mode <mode>` | Set collaboration mode: `manual` (default) or `autonomous` |
 | `agent-bridge doctor` | Diagnose setup: check configs, database access, binary paths, version |
 | `agent-bridge status` | Show active tasks, pending inbox per agent, last activity, known agents |
 | `agent-bridge tasks` | List all tasks |
@@ -241,10 +249,6 @@ npm run test:watch
 # Type-check without emitting
 npm run lint
 ```
-
-## Status
-
-V1 in development.
 
 ## License
 
