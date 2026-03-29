@@ -92,14 +92,14 @@ describe('generateRolePrompt', () => {
   ];
 
   it('contains agent name and role', () => {
-    const prompt = generateRolePrompt('cursor-dev', 'developer', agents);
+    const prompt = generateRolePrompt('cursor-dev', 'developer', agents, 'manual');
 
     expect(prompt).toContain('cursor-dev');
     expect(prompt).toContain('developer');
   });
 
   it('contains tools list', () => {
-    const prompt = generateRolePrompt('cursor-dev', 'developer', agents);
+    const prompt = generateRolePrompt('cursor-dev', 'developer', agents, 'manual');
 
     expect(prompt).toContain('peer_send');
     expect(prompt).toContain('peer_inbox');
@@ -108,24 +108,26 @@ describe('generateRolePrompt', () => {
     expect(prompt).toContain('peer_wait');
     expect(prompt).toContain('peer_complete');
     expect(prompt).toContain('peer_cancel');
+    expect(prompt).toContain('peer_check');
     expect(prompt).toContain('peer_status');
   });
 
-  it('contains Workflow section', () => {
-    const prompt = generateRolePrompt('cursor-dev', 'developer', agents);
+  it('contains manual Collaboration Mode section', () => {
+    const prompt = generateRolePrompt('cursor-dev', 'developer', agents, 'manual');
 
-    expect(prompt).toContain('## Workflow');
+    expect(prompt).toContain('## Collaboration Mode: Manual');
   });
 
-  it('contains Check Inbox section', () => {
-    const prompt = generateRolePrompt('cursor-dev', 'developer', agents);
+  it('contains autonomous Collaboration Mode section', () => {
+    const prompt = generateRolePrompt('cursor-dev', 'developer', agents, 'autonomous');
 
-    expect(prompt).toContain('## Check Inbox');
+    expect(prompt).toContain('## Collaboration Mode: Autonomous');
     expect(prompt).toContain('peer_inbox');
+    expect(prompt).toContain('peer_check');
   });
 
   it('lists peer agents excluding self', () => {
-    const prompt = generateRolePrompt('cursor-dev', 'developer', agents);
+    const prompt = generateRolePrompt('cursor-dev', 'developer', agents, 'manual');
 
     expect(prompt).toContain('claude-reviewer');
     expect(prompt).toContain('codex-tester');
@@ -141,25 +143,25 @@ describe('generateAgentsMd', () => {
   ];
 
   it('contains Agent Collaboration Rules heading', () => {
-    const md = generateAgentsMd(agents);
+    const md = generateAgentsMd(agents, 'manual');
     expect(md).toContain('# Agent Collaboration Rules');
   });
 
   it('contains agent table', () => {
-    const md = generateAgentsMd(agents);
+    const md = generateAgentsMd(agents, 'manual');
     expect(md).toContain('| Agent | Role | Client |');
     expect(md).toContain('| cursor-dev | developer | cursor |');
     expect(md).toContain('| claude-reviewer | reviewer | claude-code |');
   });
 
   it('contains Communication Protocol section', () => {
-    const md = generateAgentsMd(agents);
+    const md = generateAgentsMd(agents, 'manual');
     expect(md).toContain('## Communication Protocol');
     expect(md).toContain('peer_send');
   });
 
   it('contains Task Types section', () => {
-    const md = generateAgentsMd(agents);
+    const md = generateAgentsMd(agents, 'manual');
     expect(md).toContain('## Task Types');
     expect(md).toContain('review');
     expect(md).toContain('debug');
@@ -210,7 +212,7 @@ describe('writeRolePrompt', () => {
     const agents = [
       { name: 'cursor-dev', role: 'developer', client: 'cursor' },
     ];
-    const content = generateRolePrompt('cursor-dev', 'developer', agents);
+    const content = generateRolePrompt('cursor-dev', 'developer', agents, 'manual');
     writeRolePrompt(tmpDir, 'cursor-dev', content);
 
     const targetPath = path.join(tmpDir, '.agents', 'cursor-dev.md');
@@ -238,27 +240,28 @@ describe('generateCursorRule', () => {
   ];
 
   it('contains MDC frontmatter with alwaysApply', () => {
-    const rule = generateCursorRule('cursor-dev', 'developer', agents);
+    const rule = generateCursorRule('cursor-dev', 'developer', agents, 'manual');
     expect(rule).toMatch(/^---\n/);
     expect(rule).toContain('alwaysApply: true');
     expect(rule).toContain('description:');
   });
 
   it('includes agent name identity line', () => {
-    const rule = generateCursorRule('cursor-dev', 'developer', agents);
+    const rule = generateCursorRule('cursor-dev', 'developer', agents, 'manual');
     expect(rule).toContain('Your agent name is "cursor-dev"');
   });
 
   it('lists peer agents excluding self', () => {
-    const rule = generateCursorRule('cursor-dev', 'developer', agents);
+    const rule = generateCursorRule('cursor-dev', 'developer', agents, 'manual');
     expect(rule).toContain('claude-reviewer');
     expect(rule).not.toMatch(/\*\*cursor-dev\*\*/);
   });
 
   it('contains all MCP tools', () => {
-    const rule = generateCursorRule('cursor-dev', 'developer', agents);
+    const rule = generateCursorRule('cursor-dev', 'developer', agents, 'manual');
     expect(rule).toContain('peer_send');
     expect(rule).toContain('peer_inbox');
+    expect(rule).toContain('peer_check');
     expect(rule).toContain('peer_status');
   });
 });
@@ -270,28 +273,36 @@ describe('generateClaudeInstructions', () => {
   ];
 
   it('contains Agent Bridge section heading', () => {
-    const content = generateClaudeInstructions('claude-reviewer', 'reviewer', agents);
+    const content = generateClaudeInstructions('claude-reviewer', 'reviewer', agents, 'manual');
     expect(content).toContain('## Agent Bridge — Peer Collaboration');
   });
 
   it('includes agent identity', () => {
-    const content = generateClaudeInstructions('claude-reviewer', 'reviewer', agents);
+    const content = generateClaudeInstructions('claude-reviewer', 'reviewer', agents, 'manual');
     expect(content).toContain('"claude-reviewer"');
     expect(content).toContain('"reviewer"');
   });
 
   it('lists peer agents excluding self', () => {
-    const content = generateClaudeInstructions('claude-reviewer', 'reviewer', agents);
+    const content = generateClaudeInstructions('claude-reviewer', 'reviewer', agents, 'manual');
     expect(content).toContain('cursor-dev');
     expect(content).not.toMatch(/\*\*claude-reviewer\*\*/);
   });
 
   it('uses h3 headings for subsections', () => {
-    const content = generateClaudeInstructions('claude-reviewer', 'reviewer', agents);
+    const content = generateClaudeInstructions('claude-reviewer', 'reviewer', agents, 'manual');
     expect(content).toContain('### Available Tools');
     expect(content).toContain('### Peer Agents');
-    expect(content).toContain('### Workflow');
-    expect(content).toContain('### Check Inbox');
+    expect(content).toContain('### Collaboration Mode: Manual');
+  });
+
+  it('generates autonomous mode instructions with h3 headings', () => {
+    const content = generateClaudeInstructions('claude-reviewer', 'reviewer', agents, 'autonomous');
+    expect(content).toContain('### Collaboration Mode: Autonomous');
+    expect(content).toContain('#### On Session Start');
+    expect(content).toContain('#### Sending Tasks');
+    expect(content).toContain('#### Polling for Responses');
+    expect(content).toContain('#### Responding to Incoming Tasks');
   });
 });
 
@@ -301,7 +312,7 @@ describe('generateAgentsMd with codex agent', () => {
       { name: 'codex-tester', role: 'tester', client: 'codex' },
       { name: 'cursor-dev', role: 'developer', client: 'cursor' },
     ];
-    const md = generateAgentsMd(agents);
+    const md = generateAgentsMd(agents, 'manual');
     expect(md).toContain('Your agent name is `codex-tester`');
   });
 
@@ -309,7 +320,7 @@ describe('generateAgentsMd with codex agent', () => {
     const agents = [
       { name: 'cursor-dev', role: 'developer', client: 'cursor' },
     ];
-    const md = generateAgentsMd(agents);
+    const md = generateAgentsMd(agents, 'manual');
     expect(md).not.toContain('Your agent name is');
   });
 });
@@ -385,5 +396,64 @@ describe('writeClaudeInstructions', () => {
     expect(written).not.toContain('Old stuff');
     expect(written).toContain('## Other Section');
     expect(written).toContain('Keep this.');
+  });
+});
+
+describe('autonomy mode in generators', () => {
+  const agents = [
+    { name: 'agent-a', role: 'developer', client: 'cursor' },
+    { name: 'agent-b', role: 'reviewer', client: 'claude-code' },
+  ];
+
+  describe('manual mode', () => {
+    it('generateRolePrompt includes Manual mode header', () => {
+      const result = generateRolePrompt('agent-a', 'developer', agents, 'manual');
+      expect(result).toContain('Manual');
+      expect(result).toContain('peer_wait');
+    });
+
+    it('generateCursorRule includes Manual instructions', () => {
+      const result = generateCursorRule('agent-a', 'developer', agents, 'manual');
+      expect(result).toContain('Manual');
+      expect(result).toContain('user asks');
+    });
+
+    it('generateClaudeInstructions includes Manual mode', () => {
+      const result = generateClaudeInstructions('agent-b', 'reviewer', agents, 'manual');
+      expect(result).toContain('Manual');
+    });
+
+    it('generateAgentsMd includes manual workflow section', () => {
+      const result = generateAgentsMd(agents, 'manual');
+      expect(result).toContain('Collaboration Mode: Manual');
+    });
+  });
+
+  describe('autonomous mode', () => {
+    it('generateRolePrompt includes Autonomous mode header', () => {
+      const result = generateRolePrompt('agent-a', 'developer', agents, 'autonomous');
+      expect(result).toContain('Autonomous');
+      expect(result).toContain('peer_check');
+      expect(result).toContain('Do NOT use `peer_wait`');
+    });
+
+    it('generateCursorRule includes autonomous polling instructions', () => {
+      const result = generateCursorRule('agent-a', 'developer', agents, 'autonomous');
+      expect(result).toContain('Autonomous');
+      expect(result).toContain('peer_inbox');
+      expect(result).toContain('On Session Start');
+      expect(result).toContain('peer_check');
+    });
+
+    it('generateClaudeInstructions warns against peer_wait', () => {
+      const result = generateClaudeInstructions('agent-b', 'reviewer', agents, 'autonomous');
+      expect(result).toContain('Do NOT use `peer_wait`');
+      expect(result).toContain('peer_check');
+    });
+
+    it('generateAgentsMd mentions proactive behavior', () => {
+      const result = generateAgentsMd(agents, 'autonomous');
+      expect(result).toContain('proactively');
+    });
   });
 });

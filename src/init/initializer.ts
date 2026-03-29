@@ -18,7 +18,7 @@ import {
 } from './generator.js';
 import { openDatabase, closeDatabase } from '../store/database.js';
 import { upsertAgent } from '../store/agents.js';
-import { saveConfig, getDefaultConfig } from '../config/loader.js';
+import { saveConfig, getDefaultConfig, loadConfig } from '../config/loader.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -180,6 +180,15 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
     console.log(`Skipped: ${toForwardSlashes(configPath)} (already exists, use --force to overwrite)`);
   }
 
+  // 7b. Resolve autonomy mode from config
+  let mode: 'manual' | 'autonomous' = 'manual';
+  try {
+    const loadedConfig = loadConfig(bridgeDir);
+    mode = loadedConfig?.autonomy?.mode ?? 'manual';
+  } catch {
+    // Config may not exist yet on first init; default to manual
+  }
+
   // 8. Generate and write MCP configs for each detected client
   for (const client of detectedClients) {
     const mcpContent = generateMcpConfig(
@@ -199,7 +208,7 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
 
   // 9. Generate and write role prompts
   for (const agent of agents) {
-    const roleContent = generateRolePrompt(agent.name, agent.role, agents);
+    const roleContent = generateRolePrompt(agent.name, agent.role, agents, mode);
     const promptPath = path.join(projectRoot, '.agents', `${agent.name}.md`);
     if (fs.existsSync(promptPath) && !opts.force) {
       console.log(`Skipped: ${promptPath} (already exists, use --force to overwrite)`);
@@ -217,13 +226,13 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
 
     switch (client.name) {
       case 'cursor': {
-        const cursorContent = generateCursorRule(agent.name, agent.role, agents);
+        const cursorContent = generateCursorRule(agent.name, agent.role, agents, mode);
         writeCursorRule(projectRoot, cursorContent);
         console.log('Created: .cursor/rules/agent-bridge.mdc');
         break;
       }
       case 'claude-code': {
-        const claudeContent = generateClaudeInstructions(agent.name, agent.role, agents);
+        const claudeContent = generateClaudeInstructions(agent.name, agent.role, agents, mode);
         writeClaudeInstructions(projectRoot, claudeContent);
         const claudeMdPath = path.join(projectRoot, 'CLAUDE.md');
         const verb = fs.existsSync(claudeMdPath) ? 'Updated' : 'Created';
@@ -236,7 +245,7 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
 
   // 11. Generate and write AGENTS.md (Codex reads this natively)
   if (agents.length > 0) {
-    const agentsMdContent = generateAgentsMd(agents);
+    const agentsMdContent = generateAgentsMd(agents, mode);
     const agentsMdPath = path.join(projectRoot, 'AGENTS.md');
     if (fs.existsSync(agentsMdPath) && !opts.force) {
       showDiff(agentsMdPath, agentsMdContent);

@@ -18,6 +18,9 @@ export interface BridgeConfig {
     max_artifact_size_kb: number;
   };
   expiration_minutes: number;
+  autonomy: {
+    mode: 'manual' | 'autonomous';
+  };
 }
 
 export function loadConfig(bridgeDir: string): BridgeConfig {
@@ -40,6 +43,9 @@ export function getDefaultConfig(agents: AgentConfig[]): BridgeConfig {
       max_artifact_size_kb: DEFAULT_MAX_ARTIFACT_SIZE_KB,
     },
     expiration_minutes: 30,
+    autonomy: {
+      mode: 'manual',
+    },
   };
 }
 

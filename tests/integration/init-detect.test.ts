@@ -142,7 +142,6 @@ describe('init with cursor detected', () => {
     expect(content).toContain('peer_send');
     expect(content).toContain('peer_inbox');
     expect(content).toContain('peer_reply');
-    expect(content).toContain('## Workflow');
-    expect(content).toContain('Check Inbox');
+    expect(content).toContain('## Collaboration Mode: Manual');
   });
 });

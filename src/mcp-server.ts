@@ -11,6 +11,7 @@ import { register as registerPeerWait } from './tools/peer-wait.js';
 import { register as registerPeerComplete } from './tools/peer-complete.js';
 import { register as registerPeerCancel } from './tools/peer-cancel.js';
 import { register as registerPeerStatus } from './tools/peer-status.js';
+import { register as registerPeerCheck } from './tools/peer-check.js';
 import { loadConfig } from './config/loader.js';
 
 export type ToolCallback<T> = (args: T) => Promise<{ content: Array<{ type: string; text: string }> }>;
@@ -49,6 +50,7 @@ export async function startMcpServer(agentName: string, bridgeDir: string): Prom
   registerPeerComplete(server, db, agentName, bridgeDir);
   registerPeerCancel(server, db, agentName, bridgeDir);
   registerPeerStatus(server, db, agentName, bridgeDir);
+  registerPeerCheck(server, db, agentName, bridgeDir);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

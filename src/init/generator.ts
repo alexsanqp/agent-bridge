@@ -8,6 +8,45 @@ interface AgentInfo {
   client: string;
 }
 
+function generateWorkflowSection(mode: 'manual' | 'autonomous', heading: '##' | '###' = '##'): string {
+  if (mode === 'autonomous') {
+    return `${heading} Collaboration Mode: Autonomous
+
+You operate proactively in peer collaboration.
+
+${heading}# On Session Start
+ALWAYS call \`peer_inbox\` first. If there are tasks assigned to you,
+process them before doing anything else.
+
+${heading}# Sending Tasks
+1. Use \`peer_send\` to create the task
+2. Do NOT use \`peer_wait\` — it will timeout on most clients
+3. Continue with other work
+4. Use \`peer_check(task_id)\` to poll for responses
+5. When \`new_message_count > 0\`, read full details with \`peer_get_task\`
+
+${heading}# Polling for Responses
+When waiting for a response:
+1. Call \`peer_check(task_id)\` to check if a reply arrived
+2. If \`new_message_count\` is 0 — continue other work or tell the user you are waiting
+3. If \`new_message_count\` > 0 — call \`peer_get_task\` to read the full reply
+
+${heading}# Responding to Incoming Tasks
+When \`peer_inbox\` shows tasks assigned to you:
+1. Read with \`peer_get_task\`
+2. Do the requested work
+3. Reply with \`peer_reply\` including your results
+4. Mark complete with \`peer_complete\` if appropriate`;
+  }
+
+  return `${heading} Collaboration Mode: Manual
+
+Use peer collaboration tools when the user asks you to.
+- Send tasks when the user says "send to X" or "ask X to review"
+- Check inbox when the user says "check inbox" or "check for messages"
+- Use \`peer_wait\` to block until a reply arrives when the user wants to wait`;
+}
+
 export function generateMcpConfig(
   client: string,
   binaryPath: string,
@@ -44,6 +83,7 @@ export function generateRolePrompt(
   agentName: string,
   role: string,
   allAgents: AgentInfo[],
+  mode: 'manual' | 'autonomous',
 ): string {
   const peers = allAgents.filter((a) => a.name !== agentName);
   const peerList =
@@ -66,25 +106,14 @@ You have access to these MCP tools for collaborating with other agents:
 - \`peer_wait\` — Wait for a reply (blocks until response)
 - \`peer_complete\` — Mark a task done
 - \`peer_cancel\` — Cancel a task
+- \`peer_check\` — Quick poll for new activity on a task (lightweight)
 - \`peer_status\` — Check bridge status
 
 ## Peer Agents
 
 ${peerList}
 
-## Workflow
-
-1. When you need help from a peer, use \`peer_send\` to send them a task
-2. Use \`peer_wait\` to block until the response is back
-3. Read the response with \`peer_get_task\`
-4. Apply the results to your work
-5. Mark the task complete with \`peer_complete\`
-
-## Check Inbox
-
-Periodically check \`peer_inbox\` for tasks assigned to you.
-When you receive a task, read it with \`peer_get_task\`, do the work,
-and reply with \`peer_reply\`.
+${generateWorkflowSection(mode)}
 `;
 }
 
@@ -92,6 +121,7 @@ export function generateCursorRule(
   agentName: string,
   role: string,
   allAgents: AgentInfo[],
+  mode: 'manual' | 'autonomous',
 ): string {
   const peers = allAgents.filter((a) => a.name !== agentName);
   const peerList =
@@ -120,25 +150,14 @@ You have access to these MCP tools for collaborating with other agents:
 - \`peer_wait\` — Wait for a reply (blocks until response)
 - \`peer_complete\` — Mark a task done
 - \`peer_cancel\` — Cancel a task
+- \`peer_check\` — Quick poll for new activity on a task (lightweight)
 - \`peer_status\` — Check bridge status
 
 ## Peer Agents
 
 ${peerList}
 
-## Workflow
-
-1. When you need help from a peer, use \`peer_send\` to send them a task
-2. Use \`peer_wait\` to block until the response is back
-3. Read the response with \`peer_get_task\`
-4. Apply the results to your work
-5. Mark the task complete with \`peer_complete\`
-
-## Check Inbox
-
-Periodically check \`peer_inbox\` for tasks assigned to you.
-When you receive a task, read it with \`peer_get_task\`, do the work,
-and reply with \`peer_reply\`.
+${generateWorkflowSection(mode)}
 `;
 }
 
@@ -146,6 +165,7 @@ export function generateClaudeInstructions(
   agentName: string,
   role: string,
   allAgents: AgentInfo[],
+  mode: 'manual' | 'autonomous',
 ): string {
   const peers = allAgents.filter((a) => a.name !== agentName);
   const peerList =
@@ -167,29 +187,18 @@ You are agent "${agentName}" with role "${role}" in a peer collaboration environ
 - \`peer_wait\` — Wait for a reply (blocks until response)
 - \`peer_complete\` — Mark a task done
 - \`peer_cancel\` — Cancel a task
+- \`peer_check\` — Quick poll for new activity on a task (lightweight)
 - \`peer_status\` — Check bridge status
 
 ### Peer Agents
 
 ${peerList}
 
-### Workflow
-
-1. When you need help from a peer, use \`peer_send\` to send them a task
-2. Use \`peer_wait\` to block until the response is back
-3. Read the response with \`peer_get_task\`
-4. Apply the results to your work
-5. Mark the task complete with \`peer_complete\`
-
-### Check Inbox
-
-Periodically check \`peer_inbox\` for tasks assigned to you.
-When you receive a task, read it with \`peer_get_task\`, do the work,
-and reply with \`peer_reply\`.
+${generateWorkflowSection(mode, '###')}
 `;
 }
 
-export function generateAgentsMd(agents: AgentInfo[]): string {
+export function generateAgentsMd(agents: AgentInfo[], mode: 'manual' | 'autonomous'): string {
   const rows = agents
     .map((a) => `| ${a.name} | ${a.role} | ${a.client} |`)
     .join('\n');
@@ -224,6 +233,8 @@ ${rows}
 - \`test\` — write or run tests
 - \`question\` — ask for information or opinion
 - \`implement\` — request to implement something
+
+${generateWorkflowSection(mode)}
 `;
 }
 

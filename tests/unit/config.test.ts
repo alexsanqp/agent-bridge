@@ -110,6 +110,12 @@ describe('getDefaultConfig', () => {
     expect(config.agents[0].name).toBe('cursor-dev');
     expect(config.agents[1].name).toBe('claude-reviewer');
   });
+
+  it('includes autonomy.mode manual by default', () => {
+    const config = getDefaultConfig([]);
+    expect(config.autonomy).toBeDefined();
+    expect(config.autonomy.mode).toBe('manual');
+  });
 });
 
 describe('saveConfig', () => {
@@ -139,6 +145,14 @@ describe('saveConfig', () => {
 
     const loaded = loadConfig(bridgeDir);
     expect(loaded.expiration_minutes).toBe(60);
+  });
+
+  it('persists and loads autonomy field', () => {
+    const config = getDefaultConfig([]);
+    config.autonomy.mode = 'autonomous';
+    saveConfig(bridgeDir, config);
+    const loaded = loadConfig(bridgeDir);
+    expect(loaded.autonomy.mode).toBe('autonomous');
   });
 });
 

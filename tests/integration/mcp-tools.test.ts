@@ -995,6 +995,56 @@ describe('full task lifecycle via tool logic', () => {
     expect(active.find((t) => t.id === task.id)).toBeUndefined();
   });
 
+  it('send -> check polls for new activity -> complete', async () => {
+    // STEP 1: peer_send - agent-a sends to agent-b
+    const config = loadConfig(bridgeDir);
+    const task = createTask(db, {
+      task_type: TaskType.Review,
+      sender: 'agent-a',
+      receiver: 'agent-b',
+      summary: 'Review the PR',
+      expires_at: expiresAt(config.expiration_minutes),
+    });
+    createMessage(db, {
+      task_id: task.id,
+      author: 'agent-a',
+      kind: 'request',
+      content: 'Please review',
+    });
+
+    // STEP 2: peer_get_task - agent-b fetches -> activates
+    let fetched = getTask(db, task.id)!;
+    if (fetched.status === TaskStatus.Pending && fetched.receiver === 'agent-b') {
+      fetched = updateTaskStatus(db, task.id, TaskStatus.Active);
+    }
+    expect(fetched.status).toBe(TaskStatus.Active);
+
+    // STEP 3: peer_check - agent-a polls (no reply yet)
+    const checkpoint = now();
+    const noNewMsgs = getNewMessages(db, task.id, checkpoint);
+    expect(noNewMsgs).toHaveLength(0);
+
+    // STEP 4: agent-b replies
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    createMessage(db, {
+      task_id: task.id,
+      author: 'agent-b',
+      kind: 'reply',
+      content: 'LGTM',
+    });
+
+    // STEP 5: peer_check again - agent-a sees new message
+    const newMsgs = getNewMessages(db, task.id, checkpoint);
+    expect(newMsgs).toHaveLength(1);
+    expect(newMsgs[0].content).toBe('LGTM');
+
+    // STEP 6: peer_complete
+    updateTaskStatus(db, task.id, TaskStatus.Completed);
+    fetched = getTask(db, task.id)!;
+    expect(fetched.status).toBe(TaskStatus.Completed);
+    expect(isTerminal(fetched.status)).toBe(true);
+  });
+
   it('send -> cancel with reason creates note, then reply is blocked', () => {
     // STEP 1: Send
     const task = createTask(db, makeTaskInput());
@@ -1028,5 +1078,63 @@ describe('full task lifecycle via tool logic', () => {
     expect(messages).toHaveLength(2); // request + cancellation note
     expect(messages[1].kind).toBe('note');
     expect(messages[1].content).toBe('No longer needed');
+  });
+});
+
+// ===========================================================================
+// peer_check behavior
+// ===========================================================================
+
+describe('peer_check behavior', () => {
+  it('returns task status and total message count', () => {
+    const task = createTask(db, makeTaskInput());
+    createMessage(db, { task_id: task.id, author: 'agent-a', kind: 'request', content: 'Review this' });
+
+    // Simulate what peer_check does
+    const fetched = getTask(db, task.id)!;
+    const messages = getMessagesByTask(db, task.id);
+    const lastMsg = messages[messages.length - 1];
+
+    expect(fetched.status).toBe(TaskStatus.Pending);
+    expect(messages).toHaveLength(1);
+    expect(lastMsg.content).toBe('Review this');
+  });
+
+  it('returns only new messages when since is provided', async () => {
+    const task = createTask(db, makeTaskInput());
+    createMessage(db, { task_id: task.id, author: 'agent-a', kind: 'request', content: 'First' });
+
+    const checkpoint = now();
+    await new Promise(r => setTimeout(r, 15));
+
+    createMessage(db, { task_id: task.id, author: 'agent-b', kind: 'reply', content: 'Second' });
+
+    const newMsgs = getNewMessages(db, task.id, checkpoint);
+    expect(newMsgs).toHaveLength(1);
+    expect(newMsgs[0].content).toBe('Second');
+  });
+
+  it('returns 0 new messages when nothing changed since checkpoint', async () => {
+    const task = createTask(db, makeTaskInput());
+    createMessage(db, { task_id: task.id, author: 'agent-a', kind: 'request', content: 'First' });
+
+    await new Promise(r => setTimeout(r, 15));
+    const checkpoint = now();
+
+    const newMsgs = getNewMessages(db, task.id, checkpoint);
+    expect(newMsgs).toHaveLength(0);
+  });
+
+  it('returns TASK_NOT_FOUND for nonexistent task', () => {
+    const fetched = getTask(db, 'nonexistent');
+    expect(fetched).toBeNull();
+  });
+
+  it('reflects status changes', () => {
+    const task = createTask(db, makeTaskInput());
+    updateTaskStatus(db, task.id, TaskStatus.Active);
+
+    const fetched = getTask(db, task.id)!;
+    expect(fetched.status).toBe(TaskStatus.Active);
   });
 });
