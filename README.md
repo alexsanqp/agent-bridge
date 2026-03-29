@@ -91,38 +91,58 @@ Or edit `.agent-bridge/config.yaml` and run `agent-bridge init --force` to regen
 
 ## Usage
 
-### Manual Mode Workflow
+### Step 1: Activate each agent
 
-The user drives all collaboration:
-
-```
-User: "Send a review request to claude-reviewer"
-Agent: peer_send(to="claude-reviewer", task_type="review", summary="Review auth module", body="...")
-Agent: peer_wait(task_id="a1b2c3", timeout_seconds=120)
-       --> blocks until reply or timeout
-Agent: "Claude found 3 issues: ..."
-```
-
-### Autonomous Mode Workflow
-
-Agents collaborate proactively:
+Open each AI client (Cursor, Claude Code, Codex) and send:
 
 ```
-# Agent checks inbox on session start
-peer_inbox() --> [{ id: "a1b2c3", sender: "cursor-dev", summary: "Review auth module" }]
-
-# Agent reads and processes the task
-peer_get_task(task_id="a1b2c3") --> full task details
-# ... does the review work ...
-peer_reply(task_id="a1b2c3", body="Found 3 issues: ...")
-
-# Sending agent polls for the response (no blocking wait)
-peer_check(task_id="a1b2c3") --> { new_message_count: 1, status: "active" }
-peer_get_task(task_id="a1b2c3") --> reads the full reply
-peer_complete(task_id="a1b2c3")
+/peer-collaborate
 ```
 
-Use `peer_check` instead of `peer_wait` in autonomous mode. `peer_wait` blocks the MCP connection and may timeout on clients like Cursor (which enforce 30-200s MCP call limits). `peer_check` returns immediately and lets the agent continue working while waiting.
+The agent calls `peer_status`, registers itself as online, and sees which peers are available. Agents are considered online if active within the last 5 minutes.
+
+### Step 2: Give tasks
+
+**Manual mode** -- you tell the agent what to do:
+
+```
+=== In Cursor ===
+You: "Review the auth module and send feedback to agent-claude"
+
+Cursor calls:
+  peer_send(to="agent-claude", task_type="review",
+            summary="Review auth module", body="Check for XSS in login flow")
+  --> { task_id: "a1b2c3", status: "pending" }
+```
+
+```
+=== In Claude Code ===
+You: "Check your inbox"
+
+Claude calls:
+  peer_inbox()  --> [{ sender: "agent-cursor", summary: "Review auth module" }]
+  peer_get_task("a1b2c3")  --> full task with code
+  ... does the review ...
+  peer_reply("a1b2c3", body="Found XSS in line 42: unsanitized innerHTML")
+```
+
+```
+=== Back in Cursor ===
+You: "Check if claude replied"
+
+Cursor calls:
+  peer_check("a1b2c3")  --> { new_message_count: 1 }
+  peer_get_task("a1b2c3")  --> reads the review
+  peer_complete("a1b2c3")
+```
+
+**Autonomous mode** -- agents act proactively:
+
+Each agent checks `peer_inbox` on session start, processes incoming tasks without prompting, and uses `peer_check` to poll for responses instead of blocking with `peer_wait`.
+
+Use `peer_check` instead of `peer_wait` in both modes. `peer_wait` blocks the MCP connection and may timeout on clients like Cursor (30-200s limit). `peer_check` returns immediately.
+
+See [Getting Started](docs/getting-started.md) for detailed walkthroughs.
 
 ## Roles
 
