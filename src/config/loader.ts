@@ -11,6 +11,11 @@ export interface AgentConfig {
   enabled: boolean;
 }
 
+export interface CoordinatorConfig {
+  poll_interval_ms: number;
+  cooldown_ms: number;
+}
+
 export interface BridgeConfig {
   version: number;
   agents: AgentConfig[];
@@ -22,6 +27,7 @@ export interface BridgeConfig {
   autonomy: {
     mode: 'manual' | 'autonomous';
   };
+  coordinator?: CoordinatorConfig;
 }
 
 export function loadConfig(bridgeDir: string): BridgeConfig {
@@ -46,6 +52,10 @@ export function getDefaultConfig(agents: AgentConfig[]): BridgeConfig {
     expiration_minutes: 30,
     autonomy: {
       mode: 'manual',
+    },
+    coordinator: {
+      poll_interval_ms: 5000,
+      cooldown_ms: 30000,
     },
   };
 }

@@ -58,6 +58,19 @@ program
   });
 
 program
+  .command('watch')
+  .description('Watch for new tasks and trigger agents automatically')
+  .option('--interval <ms>', 'Poll interval in milliseconds')
+  .option('--verbose', 'Enable verbose logging')
+  .action(async (opts) => {
+    const { runWatch } = await import('./commands/coordinator.js');
+    await runWatch({
+      interval: opts.interval ? parseInt(opts.interval, 10) : undefined,
+      verbose: opts.verbose ?? false,
+    });
+  });
+
+program
   .command('mcp-server')
   .description('Start MCP stdio server (internal)')
   .requiredOption('--agent <name>', 'Agent name')
