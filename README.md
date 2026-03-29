@@ -230,6 +230,7 @@ See [Tools Reference](docs/tools-reference.md) for full parameter details and er
 
 ## Documentation
 
+- [Getting Started](docs/getting-started.md) -- first steps and activation flow
 - [Setup Guide](docs/setup-guide.md) -- detailed installation and configuration
 - [Tools Reference](docs/tools-reference.md) -- MCP tools parameter details and examples
 - [Architecture](docs/architecture.md) -- design decisions and internals

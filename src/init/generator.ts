@@ -136,6 +136,13 @@ description: Peer collaboration with other AI agents via Agent Bridge. Use when 
 You are an AI agent in a peer collaboration environment.
 Call \`peer_status\` to check your agent name and role.
 
+## Activation
+
+**First thing to do:** Call \`peer_status\` to activate yourself and see who else is online.
+Agents are considered active if seen within the last 5 minutes.
+
+**Cursor users:** Make sure the \`peer-collaborate\` skill is enabled in Cursor settings.
+
 ## Peer Agents
 
 ${peerList}

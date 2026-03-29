@@ -43,12 +43,16 @@ export function register(
                 bridge_ok: bridgeOk,
                 active_tasks: activeTasks.length,
                 pending_inbox: pendingInbox.length,
-                known_agents: agents.map((a) => ({
-                  name: a.name,
-                  role: a.role,
-                  client: a.client,
-                  last_seen: a.last_seen,
-                })),
+                known_agents: agents.map((a) => {
+                  const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000;
+                  return {
+                    name: a.name,
+                    role: a.role,
+                    client: a.client,
+                    last_seen: a.last_seen,
+                    online: (Date.now() - new Date(a.last_seen).getTime()) < ACTIVE_THRESHOLD_MS,
+                  };
+                }),
               }),
             },
           ],

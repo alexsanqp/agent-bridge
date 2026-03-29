@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type BetterSqlite3 from 'better-sqlite3';
 import { TaskType } from '../domain/models.js';
 import { BridgeError } from '../domain/errors.js';
-import { agentExists, updateLastSeen } from '../store/agents.js';
+import { agentExists, getAgent, updateLastSeen } from '../store/agents.js';
 import { createTask } from '../store/tasks.js';
 import { createMessage } from '../store/messages.js';
 import { copyArtifact } from '../store/artifacts.js';
@@ -50,6 +50,10 @@ export function register(
           };
         }
 
+        const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000;
+        const targetAgent = getAgent(db, args.to);
+        const isOnline = targetAgent && (Date.now() - new Date(targetAgent.last_seen).getTime()) < ACTIVE_THRESHOLD_MS;
+
         const projectRoot = bridgeDir.replace(/[\\/]\.agent-bridge$/, '');
         const config = loadConfig(bridgeDir);
         const policies = {
@@ -82,7 +86,11 @@ export function register(
           content: [
             {
               type: 'text' as const,
-              text: JSON.stringify({ task_id: task.id, status: 'pending' }),
+              text: JSON.stringify({
+                task_id: task.id,
+                status: 'pending',
+                ...(isOnline ? {} : { warning: `Agent '${args.to}' appears offline (last seen: ${targetAgent?.last_seen ?? 'never'}). Task will be delivered when they come online.` }),
+              }),
             },
           ],
         };
