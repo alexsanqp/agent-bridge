@@ -24,7 +24,7 @@ export function copyArtifact(
   projectRoot: string,
   policies?: Partial<PolicyConfig>,
 ): Artifact {
-  const resolvedSource = path.resolve(sourcePath);
+  const resolvedSource = path.resolve(projectRoot, sourcePath);
 
   if (!fs.existsSync(resolvedSource)) {
     throw new BridgeError(BridgeErrorCode.FILE_NOT_FOUND, `File not found: ${sourcePath}`);
