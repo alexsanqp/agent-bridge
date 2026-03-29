@@ -149,14 +149,14 @@ export async function runInit(opts: { force?: boolean; detect?: boolean; mode?: 
   const agentRoles: Map<string, string> = new Map();
   for (const client of detectedClients) {
     client.defaultAgentName = await prompt(`Agent name for ${client.name}`, client.defaultAgentName);
-    const role = await prompt(`Role for ${client.defaultAgentName} (developer/reviewer/tester/architect)`, 'developer');
+    const role = await prompt(`Role for ${client.defaultAgentName} (developer/reviewer/tester/architect/etc)`, 'developer');
     agentRoles.set(client.defaultAgentName, role);
   }
 
   if (!detect || detectedClients.length === 0) {
     console.log('No clients detected. Enter agent configuration manually.');
     const name = await prompt('Agent name', 'agent-1');
-    const role = await prompt('Role (developer/reviewer/tester/architect)', 'developer');
+    const role = await prompt('Role (developer/reviewer/tester/architect/etc)', 'developer');
     const client = await prompt('Client (cursor/claude-code/codex)', 'cursor');
     detectedClients.push({ name: client, detected: false, reason: 'manual', defaultAgentName: name });
     agentRoles.set(name, role);
