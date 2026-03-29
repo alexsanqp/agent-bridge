@@ -119,7 +119,7 @@ function updateGitignore(projectRoot: string): void {
   fs.writeFileSync(gitignorePath, content.trimEnd() + '\n' + block, 'utf-8');
 }
 
-export async function runInit(opts: { force?: boolean; detect?: boolean }): Promise<void> {
+export async function runInit(opts: { force?: boolean; detect?: boolean; mode?: string }): Promise<void> {
   const detect = opts.detect !== false;
 
   // 1. Find project root
@@ -177,8 +177,10 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
   const configPath = path.join(bridgeDir, 'config.yaml');
   let mode: 'manual' | 'autonomous' = 'manual';
 
-  // Read existing config before overwriting to preserve user settings
-  if (fs.existsSync(configPath)) {
+  // Priority: CLI --mode flag > existing config > default
+  if (opts.mode === 'manual' || opts.mode === 'autonomous') {
+    mode = opts.mode;
+  } else if (fs.existsSync(configPath)) {
     try {
       const existingConfig = loadConfig(bridgeDir);
       mode = existingConfig?.autonomy?.mode ?? 'manual';
@@ -186,7 +188,7 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
   }
 
   const config = getDefaultConfig(agents);
-  config.autonomy.mode = mode; // preserve existing mode
+  config.autonomy.mode = mode;
   if (!fs.existsSync(configPath) || opts.force) {
     saveConfig(bridgeDir, config);
     console.log(`Created: ${toForwardSlashes(configPath)}`);

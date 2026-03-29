@@ -16,6 +16,7 @@ program
   .description('Initialize agent bridge in the current project')
   .option('--force', 'Overwrite existing configs')
   .option('--no-detect', 'Skip client auto-detection')
+  .option('--mode <mode>', 'Collaboration mode: manual or autonomous', 'manual')
   .action(async (opts) => {
     const { runInit } = await import('./init/initializer.js');
     await runInit(opts);
