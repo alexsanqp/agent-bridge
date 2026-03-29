@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { detectClients } from '../../src/init/detector.js';
+import { detectClients, isCommandInPath } from '../../src/init/detector.js';
 import { runInit } from '../../src/init/initializer.js';
 
 let tmpDir: string;
@@ -32,17 +32,21 @@ describe('detectClients', () => {
     expect(cursor!.reason).toContain('.cursor/');
   });
 
-  it('skips missing clients that rely on directory detection', () => {
+  it('detects cursor via binary even without .cursor/ directory', () => {
     const root = makeTmp();
     fs.mkdirSync(path.join(root, '.git'));
-    // No .cursor/ directory created
 
     const clients = detectClients(root);
     const cursor = clients.find((c) => c.name === 'cursor');
 
-    // Cursor detection is purely directory-based, so it should be false
-    expect(cursor!.detected).toBe(false);
-    expect(cursor!.reason).toContain('not found');
+    // Cursor is detected via .cursor/ dir OR binary in PATH
+    if (isCommandInPath('cursor')) {
+      expect(cursor!.detected).toBe(true);
+      expect(cursor!.reason).toContain('cursor binary in PATH');
+    } else {
+      expect(cursor!.detected).toBe(false);
+      expect(cursor!.reason).toContain('not found');
+    }
   });
 
   it('finds .codex/ directory', () => {

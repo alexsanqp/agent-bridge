@@ -24,11 +24,18 @@ export function detectClients(projectRoot: string): DetectedClient[] {
 
   // Cursor
   const cursorDir = path.join(projectRoot, '.cursor');
-  const cursorExists = fs.existsSync(cursorDir);
+  const cursorDirExists = fs.existsSync(cursorDir);
+  const cursorInPath = isCommandInPath('cursor');
+  const cursorDetected = cursorDirExists || cursorInPath;
+  const cursorReasons: string[] = [];
+  if (cursorDirExists) cursorReasons.push('.cursor/ directory found');
+  if (cursorInPath) cursorReasons.push('cursor binary in PATH');
   clients.push({
     name: 'cursor',
-    detected: cursorExists,
-    reason: cursorExists ? '.cursor/ directory found' : '.cursor/ directory not found',
+    detected: cursorDetected,
+    reason: cursorDetected
+      ? cursorReasons.join(', ')
+      : '.cursor/ directory not found and cursor binary not found in PATH',
     defaultAgentName: 'agent-cursor',
   });
 
