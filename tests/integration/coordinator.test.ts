@@ -2,7 +2,6 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn } from 'node:child_process';
 import type BetterSqlite3 from 'better-sqlite3';
 
 vi.mock('node:child_process', () => ({
@@ -10,28 +9,33 @@ vi.mock('node:child_process', () => ({
     unref: vi.fn(),
     on: vi.fn(),
   })),
+  execFileSync: vi.fn(() => JSON.stringify({ session_id: 'test-session-123', result: 'OK' })),
 }));
 
+import { execFileSync } from 'node:child_process';
 import { pollOnce } from '../../src/commands/coordinator.js';
 import { openDatabase, closeDatabase } from '../../src/store/database.js';
 import { createTask } from '../../src/store/tasks.js';
 import { upsertAgent } from '../../src/store/agents.js';
-import { TaskStatus, TaskType } from '../../src/domain/models.js';
+import { TaskType } from '../../src/domain/models.js';
 import type { AgentConfig } from '../../src/config/loader.js';
 
-const mockedSpawn = vi.mocked(spawn);
+const mockedExecFileSync = vi.mocked(execFileSync);
 
 let tmpDir: string;
 let bridgeDir: string;
 let db: BetterSqlite3.Database;
 let lastTriggered: Map<string, number>;
+let sessionStore: Map<string, string>;
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ab-coord-'));
   bridgeDir = path.join(tmpDir, '.agent-bridge');
   db = openDatabase(bridgeDir);
   lastTriggered = new Map();
-  mockedSpawn.mockClear();
+  sessionStore = new Map();
+  mockedExecFileSync.mockClear();
+  mockedExecFileSync.mockReturnValue(JSON.stringify({ session_id: 'test-session-123', result: 'OK' }));
 });
 
 afterEach(() => {
@@ -65,13 +69,13 @@ describe('coordinator pollOnce', () => {
     upsertAgent(db, { name: agent.name, role: agent.role, client: agent.client });
     createPendingTask('agent-claude');
 
-    pollOnce(db, [agent], 30000, lastTriggered, false);
+    pollOnce(db, [agent], 30000, lastTriggered, sessionStore, tmpDir, false);
 
-    expect(mockedSpawn).toHaveBeenCalledOnce();
-    expect(mockedSpawn).toHaveBeenCalledWith(
+    expect(mockedExecFileSync).toHaveBeenCalledOnce();
+    expect(mockedExecFileSync).toHaveBeenCalledWith(
       'claude',
-      ['-p', expect.stringContaining('peer_inbox'), '--continue'],
-      expect.any(Object),
+      expect.arrayContaining(['-p', expect.stringContaining('peer_inbox')]),
+      expect.objectContaining({ cwd: tmpDir }),
     );
   });
 
@@ -80,13 +84,13 @@ describe('coordinator pollOnce', () => {
     upsertAgent(db, { name: agent.name, role: agent.role, client: agent.client });
     createPendingTask('agent-codex');
 
-    pollOnce(db, [agent], 30000, lastTriggered, false);
+    pollOnce(db, [agent], 30000, lastTriggered, sessionStore, tmpDir, false);
 
-    expect(mockedSpawn).toHaveBeenCalledOnce();
-    expect(mockedSpawn).toHaveBeenCalledWith(
+    expect(mockedExecFileSync).toHaveBeenCalledOnce();
+    expect(mockedExecFileSync).toHaveBeenCalledWith(
       'codex',
-      ['exec', expect.stringContaining('peer_inbox')],
-      expect.any(Object),
+      expect.arrayContaining(['exec', expect.stringContaining('peer_inbox')]),
+      expect.objectContaining({ cwd: tmpDir }),
     );
   });
 
@@ -94,9 +98,9 @@ describe('coordinator pollOnce', () => {
     const agent = makeAgent({ name: 'agent-claude' });
     upsertAgent(db, { name: agent.name, role: agent.role, client: agent.client });
 
-    pollOnce(db, [agent], 30000, lastTriggered, false);
+    pollOnce(db, [agent], 30000, lastTriggered, sessionStore, tmpDir, false);
 
-    expect(mockedSpawn).not.toHaveBeenCalled();
+    expect(mockedExecFileSync).not.toHaveBeenCalled();
   });
 
   it('does NOT trigger cursor agent and logs warning', () => {
@@ -105,23 +109,23 @@ describe('coordinator pollOnce', () => {
     upsertAgent(db, { name: agent.name, role: agent.role, client: agent.client });
     createPendingTask('agent-cursor');
 
-    pollOnce(db, [agent], 30000, lastTriggered, false);
+    pollOnce(db, [agent], 30000, lastTriggered, sessionStore, tmpDir, false);
 
-    expect(mockedSpawn).not.toHaveBeenCalled();
+    expect(mockedExecFileSync).not.toHaveBeenCalled();
     const logMessages = logSpy.mock.calls.map((call) => call[0]);
     expect(logMessages.some((msg) => typeof msg === 'string' && msg.includes('not supported'))).toBe(true);
   });
 
-  it('respects cooldown - no re-trigger within cooldown period', () => {
+  it('respects cooldown — no re-trigger within cooldown period', () => {
     const agent = makeAgent({ name: 'agent-claude' });
     upsertAgent(db, { name: agent.name, role: agent.role, client: agent.client });
     createPendingTask('agent-claude');
 
-    pollOnce(db, [agent], 30000, lastTriggered, false);
-    expect(mockedSpawn).toHaveBeenCalledOnce();
+    pollOnce(db, [agent], 30000, lastTriggered, sessionStore, tmpDir, false);
+    expect(mockedExecFileSync).toHaveBeenCalledOnce();
 
-    pollOnce(db, [agent], 30000, lastTriggered, false);
-    expect(mockedSpawn).toHaveBeenCalledOnce();
+    pollOnce(db, [agent], 30000, lastTriggered, sessionStore, tmpDir, false);
+    expect(mockedExecFileSync).toHaveBeenCalledOnce(); // still 1, not 2
   });
 
   it('triggers after cooldown expires', () => {
@@ -131,9 +135,9 @@ describe('coordinator pollOnce', () => {
 
     lastTriggered.set('agent-claude', Date.now() - 60000);
 
-    pollOnce(db, [agent], 30000, lastTriggered, false);
+    pollOnce(db, [agent], 30000, lastTriggered, sessionStore, tmpDir, false);
 
-    expect(mockedSpawn).toHaveBeenCalledOnce();
+    expect(mockedExecFileSync).toHaveBeenCalledOnce();
   });
 
   it('skips disabled agents', () => {
@@ -141,9 +145,9 @@ describe('coordinator pollOnce', () => {
     upsertAgent(db, { name: agent.name, role: agent.role, client: agent.client });
     createPendingTask('agent-claude');
 
-    pollOnce(db, [agent], 30000, lastTriggered, false);
+    pollOnce(db, [agent], 30000, lastTriggered, sessionStore, tmpDir, false);
 
-    expect(mockedSpawn).not.toHaveBeenCalled();
+    expect(mockedExecFileSync).not.toHaveBeenCalled();
   });
 
   it('handles multiple agents correctly', () => {
@@ -154,13 +158,29 @@ describe('coordinator pollOnce', () => {
     createPendingTask('agent-claude');
     createPendingTask('agent-codex');
 
-    pollOnce(db, [claude, codex], 30000, lastTriggered, false);
+    pollOnce(db, [claude, codex], 30000, lastTriggered, sessionStore, tmpDir, false);
 
-    expect(mockedSpawn).toHaveBeenCalledTimes(2);
-
-    const calls = mockedSpawn.mock.calls;
-    const commands = calls.map((call) => call[0]);
+    expect(mockedExecFileSync).toHaveBeenCalledTimes(2);
+    const commands = mockedExecFileSync.mock.calls.map((call) => call[0]);
     expect(commands).toContain('claude');
     expect(commands).toContain('codex');
+  });
+
+  it('captures and reuses session ID on subsequent triggers', () => {
+    const agent = makeAgent({ name: 'agent-claude', client: 'claude-code' });
+    upsertAgent(db, { name: agent.name, role: agent.role, client: agent.client });
+    createPendingTask('agent-claude');
+
+    // First trigger — no session yet
+    pollOnce(db, [agent], 30000, lastTriggered, sessionStore, tmpDir, false);
+    expect(sessionStore.get('agent-claude')).toBe('test-session-123');
+
+    // Reset cooldown and trigger again — should use --resume
+    lastTriggered.set('agent-claude', Date.now() - 60000);
+    pollOnce(db, [agent], 30000, lastTriggered, sessionStore, tmpDir, false);
+
+    const secondCall = mockedExecFileSync.mock.calls[1];
+    expect(secondCall[1]).toContain('--resume');
+    expect(secondCall[1]).toContain('test-session-123');
   });
 });

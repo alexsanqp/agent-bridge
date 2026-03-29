@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import type BetterSqlite3 from 'better-sqlite3';
 import { findProjectRoot, resolveBridgeDir } from '../utils/paths.js';
 import { openDatabase, closeDatabase } from '../store/database.js';
@@ -17,39 +17,67 @@ interface ClientTrigger {
   args: string[];
 }
 
-function getClientTrigger(client: string): ClientTrigger | null {
+const TRIGGER_PROMPT = 'You have new tasks in Agent Bridge. Check your inbox by calling peer_inbox, then process each pending task with peer_get_task and peer_reply.';
+
+function getClientCommand(client: string): string | null {
   switch (client) {
-    case 'claude-code':
-      return {
-        command: 'claude',
-        args: ['-p', 'You have new tasks in Agent Bridge. Run: peer_inbox', '--continue'],
-      };
-    case 'codex':
-      return {
-        command: 'codex',
-        args: ['exec', 'You have new tasks in Agent Bridge. Run: peer_inbox'],
-      };
-    case 'cursor':
-      return null;
-    default:
-      return null;
+    case 'claude-code': return 'claude';
+    case 'codex': return 'codex';
+    case 'cursor': return null;
+    default: return null;
   }
 }
 
-function triggerAgent(trigger: ClientTrigger, agentName: string, verbose: boolean): void {
-  const child = spawn(trigger.command, trigger.args, {
-    detached: false,
-    stdio: 'ignore',
-    shell: process.platform === 'win32',
-  });
-
-  child.unref();
-
-  child.on('error', (err) => {
-    if (verbose) {
-      log(`Error triggering ${agentName}: ${err.message}`);
+function buildTriggerArgs(client: string, sessionId: string | null): string[] {
+  if (client === 'claude-code') {
+    const args = ['-p', TRIGGER_PROMPT, '--output-format', 'json', '--allowedTools', 'mcp__agent-bridge__peer_inbox,mcp__agent-bridge__peer_get_task,mcp__agent-bridge__peer_reply,mcp__agent-bridge__peer_complete,mcp__agent-bridge__peer_status,mcp__agent-bridge__peer_check'];
+    if (sessionId) {
+      args.push('--resume', sessionId);
     }
-  });
+    return args;
+  }
+  if (client === 'codex') {
+    const args = ['exec', TRIGGER_PROMPT];
+    if (sessionId) {
+      args.push('resume', sessionId);
+    }
+    return args;
+  }
+  return [];
+}
+
+function triggerAgent(
+  command: string,
+  args: string[],
+  agentName: string,
+  projectRoot: string,
+  verbose: boolean,
+  sessionStore: Map<string, string>,
+): void {
+  try {
+    // Run synchronously to capture session ID from output
+    const result = execFileSync(command, args, {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+      timeout: 120000, // 2 min max
+      shell: process.platform === 'win32',
+    });
+
+    // Try to extract session_id from JSON output (claude -p --output-format json)
+    try {
+      const parsed = JSON.parse(result);
+      if (parsed.session_id) {
+        sessionStore.set(agentName, parsed.session_id);
+        if (verbose) {
+          log(`${agentName}: captured session ${parsed.session_id}`);
+        }
+      }
+    } catch { /* not JSON or no session_id — OK */ }
+  } catch (err) {
+    if (verbose) {
+      log(`Error triggering ${agentName}: ${(err as Error).message}`);
+    }
+  }
 }
 
 function log(msg: string): void {
@@ -67,6 +95,8 @@ export function pollOnce(
   agents: AgentConfig[],
   cooldownMs: number,
   lastTriggered: Map<string, number>,
+  sessionStore: Map<string, string>,
+  projectRoot: string,
   verbose: boolean,
 ): void {
   for (const agent of agents) {
@@ -89,15 +119,18 @@ export function pollOnce(
       continue;
     }
 
-    const trigger = getClientTrigger(agent.client);
-    if (!trigger) {
+    const command = getClientCommand(agent.client);
+    if (!command) {
       log(`${agent.name}: ${agent.client} local trigger not supported`);
       continue;
     }
 
-    triggerAgent(trigger, agent.name, verbose);
+    const sessionId = sessionStore.get(agent.name) ?? null;
+    const args = buildTriggerArgs(agent.client, sessionId);
+
+    log(`Triggering ${agent.name} (${agent.client}) — ${pending.length} pending task(s)${sessionId ? ` [session: ${sessionId.slice(0, 8)}...]` : ' [new session]'}`);
+    triggerAgent(command, args, agent.name, projectRoot, verbose, sessionStore);
     lastTriggered.set(agent.name, Date.now());
-    log(`Triggered ${agent.name} (${agent.client}) — ${pending.length} pending task(s)`);
   }
 }
 
@@ -124,13 +157,14 @@ export async function runWatch(opts: WatchOptions): Promise<void> {
   const cooldownMs = config.coordinator?.cooldown_ms ?? 30000;
   const verbose = opts.verbose ?? false;
   const lastTriggered = new Map<string, number>();
+  const sessionStore = new Map<string, string>();
 
   log(`Started — polling every ${intervalMs}ms, cooldown ${cooldownMs / 1000}s`);
   log(`Watching ${enabledAgents.length} agent(s): ${enabledAgents.map((a) => a.name).join(', ')}`);
 
   // Warn about unsupported clients
   for (const agent of enabledAgents) {
-    if (!getClientTrigger(agent.client)) {
+    if (!getClientCommand(agent.client)) {
       log(`Warning: ${agent.name} (${agent.client}) — local trigger not supported, will skip`);
     }
   }
@@ -150,7 +184,7 @@ export async function runWatch(opts: WatchOptions): Promise<void> {
 
   while (running) {
     try {
-      pollOnce(db, enabledAgents, cooldownMs, lastTriggered, verbose);
+      pollOnce(db, enabledAgents, cooldownMs, lastTriggered, sessionStore, projectRoot, verbose);
     } catch (err) {
       console.error(`[watch] Poll error: ${(err as Error).message}`);
     }
