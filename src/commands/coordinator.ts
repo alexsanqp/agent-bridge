@@ -16,6 +16,7 @@ export interface WatchOptions {
 }
 
 const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000;
+const IDLE_SHUTDOWN_MS = 10 * 60 * 1000; // shutdown after 10min with no activity
 
 function getClientCommand(client: string): string | null {
   switch (client) {
@@ -39,8 +40,9 @@ function triggerAgent(command: string, args: string[], projectRoot: string, verb
   const child = spawn(command, args, {
     cwd: projectRoot,
     detached: true,
-    stdio: verbose ? 'inherit' : 'ignore',
+    stdio: 'ignore',
     shell: process.platform === 'win32',
+    windowsHide: true,
   });
   child.unref();
   child.on('error', (err) => {
@@ -74,10 +76,10 @@ export function isCoordinatorRunning(bridgeDir: string): boolean {
   if (!fs.existsSync(pidPath)) return false;
   try {
     const pid = parseInt(fs.readFileSync(pidPath, 'utf-8').trim(), 10);
-    process.kill(pid, 0); // signal 0 = check if process exists
+    if (isNaN(pid)) return false;
+    process.kill(pid, 0);
     return true;
   } catch {
-    // Process not running, stale PID file
     try { fs.unlinkSync(pidPath); } catch { /* ignore */ }
     return false;
   }
@@ -96,11 +98,14 @@ function removePidFile(bridgeDir: string): void {
 export function ensureCoordinatorRunning(bridgeDir: string, projectRoot: string): void {
   if (isCoordinatorRunning(bridgeDir)) return;
 
-  const binaryPath = process.argv[1]; // path to cli.js
-  const child = spawn(process.execPath, [binaryPath, 'watch'], {
+  // Resolve the agent-bridge binary
+  const isWindows = process.platform === 'win32';
+  const child = spawn('agent-bridge', ['watch'], {
     cwd: projectRoot,
     detached: true,
     stdio: 'ignore',
+    shell: isWindows, // needed for .cmd shims on Windows
+    windowsHide: true, // prevents CMD window flash on Windows
   });
   child.unref();
 }
@@ -155,9 +160,8 @@ export async function runWatch(opts: WatchOptions): Promise<void> {
     process.exit(1);
   }
 
-  // Check if already running
   if (isCoordinatorRunning(bridgeDir)) {
-    console.error('[watch] Coordinator already running.');
+    log('Coordinator already running.');
     process.exit(0);
   }
 
@@ -167,27 +171,26 @@ export async function runWatch(opts: WatchOptions): Promise<void> {
     process.exit(1);
   }
 
-  const triggerableAgents = enabledAgents.filter(a => getClientCommand(a.client));
-  if (triggerableAgents.length === 0) {
-    console.error('[watch] No triggerable agents (only claude-code and codex supported).');
-    process.exit(1);
-  }
-
   const db = openDatabase(bridgeDir);
   const intervalMs = opts.interval ?? config.coordinator?.poll_interval_ms ?? 5000;
   const cooldownMs = config.coordinator?.cooldown_ms ?? 30000;
   const verbose = opts.verbose ?? false;
   const lastTriggered = new Map<string, number>();
+  let lastActivity = Date.now(); // tracks last time we saw any online agent or triggered
 
   writePidFile(bridgeDir);
 
-  log(`Started — polling every ${intervalMs}ms, cooldown ${cooldownMs / 1000}s`);
-  log(`Watching: ${triggerableAgents.map(a => `${a.name} (${a.client})`).join(', ')}`);
+  log(`Started (pid ${process.pid}) — polling every ${intervalMs / 1000}s, cooldown ${cooldownMs / 1000}s`);
 
-  const unsupported = enabledAgents.filter(a => !getClientCommand(a.client));
-  for (const agent of unsupported) {
-    log(`Skipping ${agent.name} (${agent.client}) — no local trigger`);
-  }
+  const triggerableNames = enabledAgents
+    .filter(a => getClientCommand(a.client))
+    .map(a => `${a.name} (${a.client})`);
+  const untriggerableNames = enabledAgents
+    .filter(a => !getClientCommand(a.client))
+    .map(a => `${a.name} (${a.client})`);
+
+  if (triggerableNames.length > 0) log(`Watching: ${triggerableNames.join(', ')}`);
+  if (untriggerableNames.length > 0) log(`Skipping (no local trigger): ${untriggerableNames.join(', ')}`);
 
   let running = true;
 
@@ -207,9 +210,14 @@ export async function runWatch(opts: WatchOptions): Promise<void> {
     try {
       pollOnce(db, enabledAgents, cooldownMs, lastTriggered, projectRoot, verbose);
 
-      // Auto-shutdown if all agents offline
-      if (allAgentsOffline(db)) {
-        log('All agents offline — shutting down');
+      // Track activity: if any agent is online, reset idle timer
+      if (!allAgentsOffline(db)) {
+        lastActivity = Date.now();
+      }
+
+      // Auto-shutdown after sustained idle period (no online agents for IDLE_SHUTDOWN_MS)
+      if (Date.now() - lastActivity > IDLE_SHUTDOWN_MS) {
+        log('No agent activity for 10 minutes — shutting down');
         shutdown();
       }
     } catch (err) {
