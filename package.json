@@ -1,6 +1,6 @@
 {
   "name": "@plus-minus/agent-bridge",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Peer collaboration bridge for AI coding agents",
   "type": "module",
   "main": "dist/index.js",
