@@ -12,6 +12,7 @@ export interface AgentConfig {
 }
 
 export interface CoordinatorConfig {
+  enabled: boolean;
   poll_interval_ms: number;
   cooldown_ms: number;
 }
@@ -54,6 +55,7 @@ export function getDefaultConfig(agents: AgentConfig[]): BridgeConfig {
       mode: 'manual',
     },
     coordinator: {
+      enabled: false,
       poll_interval_ms: 5000,
       cooldown_ms: 30000,
     },

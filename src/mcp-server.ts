@@ -3,6 +3,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import type BetterSqlite3 from 'better-sqlite3';
 import { openDatabase, closeDatabase } from './store/database.js';
 import { upsertAgent, updateLastSeen } from './store/agents.js';
+import { ensureCoordinatorRunning } from './commands/coordinator.js';
+import { findProjectRoot } from './utils/paths.js';
 import { register as registerPeerSend } from './tools/peer-send.js';
 import { register as registerPeerReply } from './tools/peer-reply.js';
 import { register as registerPeerInbox } from './tools/peer-inbox.js';
@@ -51,6 +53,14 @@ export async function startMcpServer(agentName: string, bridgeDir: string): Prom
   registerPeerCancel(server, db, agentName, bridgeDir);
   registerPeerStatus(server, db, agentName, bridgeDir);
   registerPeerCheck(server, db, agentName, bridgeDir);
+
+  // Auto-start coordinator if enabled in config
+  if (config.coordinator?.enabled) {
+    try {
+      const projectRoot = bridgeDir.replace(/[\\/]\.agent-bridge$/, '');
+      ensureCoordinatorRunning(bridgeDir, projectRoot);
+    } catch { /* ignore — coordinator is optional */ }
+  }
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
