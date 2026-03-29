@@ -81,19 +81,29 @@ The `peer_wait` tool blocks the MCP connection until a reply arrives or the time
 
 `peer_check` solves this by returning immediately with a count of new messages and the current task status. The agent can call it periodically, continuing other work between checks. This pattern is reliable across all clients and is the recommended approach in autonomous mode.
 
-## Client-specific instruction delivery
+## Unified SKILL.md instruction delivery
 
-Different AI clients read agent instructions from different file locations and formats. Agent Bridge generates instructions in the native format for each client:
+As of v0.3.0, agent instructions are delivered via a single unified `SKILL.md` file instead of per-client instruction files. This file contains all collaboration instructions: peer tool usage, workflow rules for the configured autonomy mode, and peer agent list.
 
-| Client | File | Format | Mechanism |
-|--------|------|--------|-----------|
-| Cursor | `.cursor/rules/agent-bridge.mdc` | MDC (Markdown with frontmatter) | Cursor applies rules with `alwaysApply: true` to every session automatically |
-| Claude Code | `CLAUDE.md` | Markdown | Claude Code reads `CLAUDE.md` as project-level instructions. Agent Bridge appends or replaces the `## Agent Bridge -- Peer Collaboration` section |
-| Codex CLI | `AGENTS.md` | Markdown | Codex reads `AGENTS.md` natively for collaboration rules |
+### Skill discovery paths
 
-All three formats contain the same logical content: agent identity, role, peer list, available tools, and workflow instructions matching the configured autonomy mode. The init command writes all applicable files based on which clients were detected.
+Each client discovers skills from a different directory:
 
-When re-running `agent-bridge init`, the Claude Code section in `CLAUDE.md` is replaced in-place (preserving other content in the file), while Cursor and Codex files are overwritten entirely.
+| Client | Skill path | Discovery mechanism |
+|--------|-----------|---------------------|
+| Cursor | `.agents/skills/peer-collaborate/SKILL.md` | Cursor discovers skills from `.agents/skills/` |
+| Claude Code | `.claude/skills/peer-collaborate/SKILL.md` | Claude Code discovers skills from `.claude/skills/` |
+| Codex CLI | `AGENTS.md` | Codex reads this file natively |
+
+Both `SKILL.md` files contain the same content. `CLAUDE.md` receives only a minimal pointer directing the agent to the skill -- it no longer contains the full instruction block.
+
+### Agent identity at runtime
+
+Agent identity (name, role, peers) is resolved dynamically via `peer_status` rather than being hardcoded into prompt files. This decouples the instruction content from specific agent configurations and makes the skill truly reusable.
+
+### Legacy files
+
+The previous per-client files (`.cursor/rules/agent-bridge.mdc`, individual `.agents/<name>.md` prompts) are no longer generated. Existing `.cursor/rules/agent-bridge.mdc` files are cleaned up automatically on re-init.
 
 ## Security policies
 

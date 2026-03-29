@@ -60,8 +60,8 @@ This will:
 2. Detect installed clients (Cursor, Claude Code, Codex CLI)
 3. Prompt for agent names and roles for each detected client
 4. Generate MCP configs for each detected client
-5. Write client-specific instruction files (`.cursor/rules/agent-bridge.mdc`, `CLAUDE.md`, `AGENTS.md`)
-6. Create role prompts in `.agents/`
+5. Write a unified `SKILL.md` for peer collaboration (in `.agents/skills/` and `.claude/skills/`)
+6. Append a minimal pointer to `CLAUDE.md` (not full instructions)
 7. Initialize the SQLite database and register agents
 8. Update `.gitignore` to exclude runtime data
 
@@ -135,10 +135,14 @@ agents:
   - name: cursor-dev
     role: developer
     client: cursor
+    enabled: true
   - name: claude-reviewer
     role: reviewer
     client: claude-code
+    enabled: true
 ```
+
+Set `enabled: false` to disable an agent without removing it from the config. Disabled agents are excluded from instruction generation and peer lists. Re-enable by setting `enabled: true` and running `agent-bridge init`.
 
 After editing, run `agent-bridge init --force` to regenerate instruction files with the updated roles.
 
@@ -146,7 +150,7 @@ After editing, run `agent-bridge init --force` to regenerate instruction files w
 
 | Command | Description |
 |---------|-------------|
-| `agent-bridge init` | Set up project bridge structure, detect clients, generate MCP configs and role prompts |
+| `agent-bridge init` | Set up project bridge structure, detect clients, generate MCP configs and skill files |
 | `agent-bridge init --force` | Overwrite existing configs |
 | `agent-bridge init --no-detect` | Skip client auto-detection, prompt for all |
 | `agent-bridge init --mode <mode>` | Set collaboration mode: `manual` (default) or `autonomous` |
@@ -183,25 +187,30 @@ your-project/
     logs/                 # bridge logs (gitignored)
   .cursor/
     mcp.json              # Cursor MCP config
-    rules/
-      agent-bridge.mdc    # Cursor agent instructions (auto-applied rule)
   .mcp.json               # Claude Code MCP config
   .codex/
     config.toml           # Codex CLI MCP config
   .agents/
-    cursor-dev.md         # role prompt for Cursor agent
-    claude-reviewer.md    # role prompt for Claude agent
-    codex-tester.md       # role prompt for Codex agent
-  CLAUDE.md               # Claude Code agent instructions (Agent Bridge section appended)
+    skills/
+      peer-collaborate/
+        SKILL.md          # unified peer collaboration instructions (all clients)
+  .claude/
+    skills/
+      peer-collaborate/
+        SKILL.md          # symlink / copy for Claude Code skill discovery
+  CLAUDE.md               # minimal pointer to SKILL.md (Agent Bridge section appended)
   AGENTS.md               # shared collaboration rules (Codex reads this natively)
 ```
 
 MCP configs contain absolute paths to the binary and bridge directory. They are regenerated with correct local paths on `agent-bridge init` after cloning.
 
-Client-specific instruction files are generated per client type:
-- **Cursor:** `.cursor/rules/agent-bridge.mdc` -- an always-applied MDC rule
-- **Claude Code:** `CLAUDE.md` -- Agent Bridge section is appended or replaced
-- **Codex CLI:** `AGENTS.md` -- Codex reads this file natively
+Agent instructions are delivered via a unified `SKILL.md` file placed in skill discovery paths:
+- `.agents/skills/peer-collaborate/SKILL.md` -- primary location (Cursor discovers skills here)
+- `.claude/skills/peer-collaborate/SKILL.md` -- Claude Code skill discovery path
+- `CLAUDE.md` receives a minimal pointer to the skill, not full instructions
+- `AGENTS.md` -- Codex reads this file natively for collaboration rules
+
+This replaces the previous approach of per-client instruction files (`.cursor/rules/agent-bridge.mdc`, individual `.agents/*.md` prompts). Agent identity is now resolved from `peer_status` at runtime, not hardcoded in prompt files.
 
 ## MCP Tools Reference
 

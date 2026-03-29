@@ -45,6 +45,8 @@ The CLI scans for known client config directories to determine which AI editors 
 - **Claude Code:** checks for Claude Code indicators
 - **Codex CLI:** checks for `.codex/` directory
 
+During first init, you will be prompted to confirm each detected client (e.g., "Enable cursor? [Y/n]"). Declining sets `enabled: false` for that agent in `config.yaml` -- the agent is preserved in the config but excluded from instruction generation.
+
 Skip detection with `--no-detect` to enter agents manually. Set the collaboration mode with `--mode`:
 
 ```bash
@@ -66,23 +68,26 @@ The init command generates:
 
 - `.agent-bridge/config.yaml` -- central config with agents, policies, and autonomy mode
 - MCP configs for each client (`.cursor/mcp.json`, `.mcp.json`, `.codex/config.toml`)
-- Role prompts in `.agents/<agent-name>.md`
-- Client-specific instruction files (see below)
+- `.agents/skills/peer-collaborate/SKILL.md` -- unified peer collaboration instructions
+- `.claude/skills/peer-collaborate/SKILL.md` -- Claude Code skill discovery path
+- `CLAUDE.md` -- minimal pointer to the skill (appended or replaced)
 - `AGENTS.md` with shared collaboration rules
 - SQLite database schema at `.agent-bridge/bridge.db`
 - `.gitignore` entries for runtime data
 
-## Client-specific instruction files
+## Skill-based instruction delivery
 
-Each client type receives instructions in the format it reads natively:
+As of v0.3.0, agent instructions are delivered via a unified `SKILL.md` file rather than per-client instruction files. The skill is placed in discovery paths for each client:
 
-| Client | File | How it works |
-|--------|------|--------------|
-| Cursor | `.cursor/rules/agent-bridge.mdc` | MDC rule with `alwaysApply: true` -- Cursor loads it automatically on every session |
-| Claude Code | `CLAUDE.md` | Agent Bridge section is appended (or replaced if already present). Claude Code reads this file as project instructions |
-| Codex CLI | `AGENTS.md` | Codex reads this file natively for agent collaboration rules |
+| Client | Skill discovery path | Additional |
+|--------|---------------------|------------|
+| Cursor | `.agents/skills/peer-collaborate/SKILL.md` | Cursor discovers skills from `.agents/skills/` |
+| Claude Code | `.claude/skills/peer-collaborate/SKILL.md` | Claude Code discovers skills from `.claude/skills/` |
+| Codex CLI | `AGENTS.md` | Codex reads this file natively |
 
-These files contain the agent's name, role, list of peer agents, available tools, and workflow instructions matching the configured autonomy mode.
+`CLAUDE.md` receives a minimal pointer directing Claude Code to the skill, not the full instructions. Agent identity is resolved at runtime via `peer_status`, not hardcoded in prompt files.
+
+The previous per-client files (`.cursor/rules/agent-bridge.mdc`, `.agents/<name>.md`) are no longer generated. Existing `.cursor/rules/agent-bridge.mdc` files are cleaned up on re-init.
 
 ## Manual vs autonomous mode
 
@@ -133,6 +138,32 @@ agent-bridge tasks             # List all tasks
 agent-bridge tasks --status pending  # Filter by status
 agent-bridge reset             # Clear expired and cancelled tasks
 ```
+
+## Enabling and disabling agents
+
+Each agent in `config.yaml` has an `enabled` flag:
+
+```yaml
+agents:
+  - name: cursor-dev
+    role: developer
+    client: cursor
+    enabled: true
+  - name: claude-reviewer
+    role: reviewer
+    client: claude-code
+    enabled: false    # excluded from instruction generation and peer lists
+```
+
+To disable an agent, set `enabled: false` and run `agent-bridge init`. To re-enable, set `enabled: true` and run `agent-bridge init` again. The agent's config is preserved either way.
+
+## Re-init behavior
+
+Running `agent-bridge init` without `--force` reads the existing `config.yaml` and preserves agents, roles, and settings. This means:
+
+- Adding a new client does not reset existing agents
+- Changing a role in `config.yaml` and re-running init regenerates instruction files
+- Use `--force` to overwrite configs and go through the full interactive setup again
 
 ## Changing agent roles
 

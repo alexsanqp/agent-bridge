@@ -91,6 +91,16 @@ resolve to the same file.
 Tasks have a configurable TTL set by `expiration_minutes` in the config
 (default: 30 minutes). Increase this value for long-running review tasks.
 
+## Agent was disabled but I want to enable it
+
+**Symptom:** An agent exists in `config.yaml` with `enabled: false` and is not participating in collaboration.
+
+**Solution:**
+
+1. Edit `.agent-bridge/config.yaml` and set `enabled: true` for the agent
+2. Run `agent-bridge init` to regenerate instruction files with the agent included
+3. Restart the AI client session
+
 ## Database locked errors
 
 SQLite WAL mode supports concurrent readers but only one writer at a time.
