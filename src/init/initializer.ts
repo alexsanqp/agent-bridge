@@ -9,8 +9,12 @@ import {
   generateMcpConfig,
   generateRolePrompt,
   generateAgentsMd,
+  generateCursorRule,
+  generateClaudeInstructions,
   writeMcpConfig,
   writeRolePrompt,
+  writeCursorRule,
+  writeClaudeInstructions,
 } from './generator.js';
 import { openDatabase, closeDatabase } from '../store/database.js';
 import { upsertAgent } from '../store/agents.js';
@@ -206,7 +210,31 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
     }
   }
 
-  // 10. Generate and write AGENTS.md
+  // 10. Generate and write client-specific instruction files
+  for (const client of detectedClients) {
+    const agent = agents.find((a) => a.client === client.name);
+    if (!agent) continue;
+
+    switch (client.name) {
+      case 'cursor': {
+        const cursorContent = generateCursorRule(agent.name, agent.role, agents);
+        writeCursorRule(projectRoot, cursorContent);
+        console.log('Created: .cursor/rules/agent-bridge.mdc');
+        break;
+      }
+      case 'claude-code': {
+        const claudeContent = generateClaudeInstructions(agent.name, agent.role, agents);
+        writeClaudeInstructions(projectRoot, claudeContent);
+        const claudeMdPath = path.join(projectRoot, 'CLAUDE.md');
+        const verb = fs.existsSync(claudeMdPath) ? 'Updated' : 'Created';
+        console.log(`${verb}: CLAUDE.md (Agent Bridge section)`);
+        break;
+      }
+      // codex: AGENTS.md is handled in step 11 below
+    }
+  }
+
+  // 11. Generate and write AGENTS.md (Codex reads this natively)
   if (agents.length > 0) {
     const agentsMdContent = generateAgentsMd(agents);
     const agentsMdPath = path.join(projectRoot, 'AGENTS.md');
@@ -220,23 +248,23 @@ export async function runInit(opts: { force?: boolean; detect?: boolean }): Prom
     }
   }
 
-  // 11. Update .gitignore
+  // 12. Update .gitignore
   updateGitignore(projectRoot);
   console.log('Updated: .gitignore');
 
-  // 12. Open database (creates schema)
+  // 13. Open database (creates schema)
   const db = openDatabase(bridgeDir);
 
-  // 13. Register agents in DB
+  // 14. Register agents in DB
   for (const agent of agents) {
     upsertAgent(db, agent);
     console.log(`Registered agent: ${agent.name} (${agent.role})`);
   }
 
-  // 14. Close database
+  // 15. Close database
   closeDatabase(db);
 
-  // 15. Summary
+  // 16. Summary
   console.log('\n--- Init complete ---');
   console.log(`  Bridge dir: ${bridgeDir}`);
   console.log(`  Agents: ${agents.length > 0 ? agents.map((a) => a.name).join(', ') : '(none)'}`);
