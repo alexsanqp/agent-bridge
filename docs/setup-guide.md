@@ -95,7 +95,9 @@ Agent Bridge supports two collaboration modes:
 
 **Manual (default):** Agents only use peer tools when the user explicitly asks. Good for getting started or when you want full control over inter-agent communication.
 
-**Autonomous:** Agents proactively check their inbox on session start, process incoming tasks without user prompting, and poll for responses using `peer_check` instead of blocking with `peer_wait`. Recommended for multi-agent workflows where agents run in parallel across separate editor windows.
+**Autonomous:** Agents proactively check their inbox on session start, process incoming tasks without user prompting, and poll for responses using `peer_check` instead of blocking with `peer_wait`.
+
+> **Note:** Autonomous mode is experimental and may not work reliably with all clients yet. The behavior depends on how well each AI client follows the SKILL.md instructions for proactive inbox checking and polling. Use manual mode for production workflows.
 
 The mode is set in `.agent-bridge/config.yaml`:
 

@@ -78,7 +78,9 @@ autonomy:
 
 **Manual mode (default):** Agents use collaboration tools only when the user explicitly asks. The user drives the workflow -- "send this to X", "check my inbox", etc.
 
-**Autonomous mode:** Agents proactively check their inbox on session start and poll for responses using `peer_check`. They process incoming tasks without waiting for user instructions. This is the recommended mode for multi-agent workflows where agents run in separate editor windows.
+**Autonomous mode:** Agents proactively check their inbox on session start and poll for responses using `peer_check`. They process incoming tasks without waiting for user instructions.
+
+> **Note:** Autonomous mode is experimental and may not work reliably with all clients yet. The behavior depends on how well each AI client follows the SKILL.md instructions for proactive inbox checking and polling. Use manual mode for production workflows.
 
 Set the mode during init with `--mode`:
 

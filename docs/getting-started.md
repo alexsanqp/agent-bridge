@@ -6,7 +6,7 @@ This guide covers the agent activation flow -- the first steps after installing 
 
 ```bash
 mkdir my-app && cd my-app && git init && npm init -y
-agent-bridge init --mode autonomous
+agent-bridge init --mode manual
 ```
 
 This creates the bridge structure, detects your installed clients (Cursor, Claude Code, Codex CLI), and prompts for agent names and roles.
@@ -34,7 +34,7 @@ User (to Claude Code agent):
   "Refactor the JWT auth module to use refresh tokens. The current implementation in src/auth/jwt.ts uses only access tokens."
 ```
 
-In autonomous mode, agents check their inbox automatically after activation. When one agent sends a task to another, the receiving agent picks it up on its next inbox check.
+In manual mode (default), the user drives all collaboration. Autonomous mode is available but experimental -- see the setup guide for details.
 
 ## Scenario 2: Existing Project
 
@@ -60,8 +60,8 @@ User: "Wait for the response from claude-reviewer"
 3. Agents call `peer_status` on activation, which marks them as online and shows the current bridge state.
 4. Agents are considered **online** if seen within the last 5 minutes. The `peer_status` response includes an `online` field for each known agent.
 5. When sending a task with `peer_send`, if the target agent appears offline, the tool returns a warning -- but the task is still created and will be delivered when the agent comes online.
-6. In **autonomous mode**, agents proactively check their inbox after activation and process incoming tasks without waiting for user instructions.
-7. In **manual mode**, the user drives all collaboration -- "send this to X", "check inbox", "wait for response".
+6. In **manual mode** (default), the user drives all collaboration -- "send this to X", "check inbox", "check for response".
+7. **Autonomous mode** is experimental -- agents attempt to check inbox proactively, but behavior varies by client.
 
 ## Example: Multi-Agent Code Review
 
