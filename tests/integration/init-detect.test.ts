@@ -124,7 +124,7 @@ describe('init with cursor detected', () => {
 
     await runInit({ force: true, detect: true });
 
-    const promptPath = path.join(root, '.agents', 'cursor-dev.md');
+    const promptPath = path.join(root, '.agents', 'agent-cursor.md');
     expect(fs.existsSync(promptPath)).toBe(true);
   });
 
@@ -135,7 +135,7 @@ describe('init with cursor detected', () => {
 
     await runInit({ force: true, detect: true });
 
-    const promptPath = path.join(root, '.agents', 'cursor-dev.md');
+    const promptPath = path.join(root, '.agents', 'agent-cursor.md');
     const content = fs.readFileSync(promptPath, 'utf-8');
 
     expect(content).toContain('# Role:');

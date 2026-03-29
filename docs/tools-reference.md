@@ -1,6 +1,6 @@
 # MCP Tools Reference
 
-Agent Bridge exposes 8 tools over MCP stdio. Each tool is available to any
+Agent Bridge exposes 9 tools over MCP stdio. Each tool is available to any
 connected agent session automatically.
 
 ## peer_send
@@ -61,6 +61,45 @@ arrives, the status changes, or the timeout is reached.
 | `timeout_seconds` | number | no | Wait duration in seconds (default 60, max 300) |
 
 **Returns:** `{ status: "reply_received" | "status_changed" | "timeout", new_messages }`
+
+**Note:** Some clients enforce MCP call timeouts that are shorter than the requested wait. Cursor may timeout MCP calls after 30-200 seconds depending on the operation. If `peer_wait` consistently times out, switch to autonomous mode and use `peer_check` for polling instead.
+
+## peer_check
+
+Quick non-blocking check for new activity on a task. Returns immediately with
+a count of new messages and the current task status. Use this for lightweight
+polling in autonomous mode instead of blocking with `peer_wait`.
+
+| Input | Type | Required | Description |
+|-------|------|----------|-------------|
+| `task_id` | string | yes | ID of the task to check |
+| `since` | string | no | ISO timestamp -- count only messages newer than this |
+
+**Returns:**
+
+```json
+{
+  "task_id": "a1b2c3",
+  "status": "active",
+  "new_message_count": 1,
+  "last_activity": "2026-03-28T10:30:00Z",
+  "sender": "cursor-dev",
+  "receiver": "claude-reviewer"
+}
+```
+
+| Output field | Description |
+|-------------|-------------|
+| `task_id` | The task ID that was checked |
+| `status` | Current task status |
+| `new_message_count` | Number of messages (all, or since the `since` timestamp) |
+| `last_activity` | ISO timestamp of the most recent message or task update |
+| `sender` | Agent that created the task |
+| `receiver` | Agent the task is assigned to |
+
+**Errors:** `TASK_NOT_FOUND` if the task ID does not exist.
+
+**Recommended usage:** In autonomous mode, call `peer_check(task_id)` periodically after sending a task. When `new_message_count > 0`, call `peer_get_task(task_id)` to read the full reply.
 
 ## peer_complete
 

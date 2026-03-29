@@ -53,42 +53,22 @@ describe('detectClients with .codex/ dir', () => {
 });
 
 describe('default agent names', () => {
-  it('cursor default agent name is cursor-dev', () => {
+  it('cursor default agent name is agent-cursor', () => {
     const clients = detectClients(tmpDir);
     const cursor = clients.find((c) => c.name === 'cursor');
-    expect(cursor!.defaultAgentName).toBe('cursor-dev');
+    expect(cursor!.defaultAgentName).toBe('agent-cursor');
   });
 
-  it('claude-code default agent name is claude-reviewer', () => {
+  it('claude-code default agent name is agent-claude', () => {
     const clients = detectClients(tmpDir);
     const claude = clients.find((c) => c.name === 'claude-code');
-    expect(claude!.defaultAgentName).toBe('claude-reviewer');
+    expect(claude!.defaultAgentName).toBe('agent-claude');
   });
 
-  it('codex default agent name is codex-tester', () => {
+  it('codex default agent name is agent-codex', () => {
     const clients = detectClients(tmpDir);
     const codex = clients.find((c) => c.name === 'codex');
-    expect(codex!.defaultAgentName).toBe('codex-tester');
-  });
-});
-
-describe('default roles', () => {
-  it('cursor default role is developer', () => {
-    const clients = detectClients(tmpDir);
-    const cursor = clients.find((c) => c.name === 'cursor');
-    expect(cursor!.defaultRole).toBe('developer');
-  });
-
-  it('claude-code default role is reviewer', () => {
-    const clients = detectClients(tmpDir);
-    const claude = clients.find((c) => c.name === 'claude-code');
-    expect(claude!.defaultRole).toBe('reviewer');
-  });
-
-  it('codex default role is tester', () => {
-    const clients = detectClients(tmpDir);
-    const codex = clients.find((c) => c.name === 'codex');
-    expect(codex!.defaultRole).toBe('tester');
+    expect(codex!.defaultAgentName).toBe('agent-codex');
   });
 });
 

@@ -3,11 +3,10 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 export interface DetectedClient {
-  name: string;
+  name: string;          // client type: 'cursor' | 'claude-code' | 'codex'
   detected: boolean;
   reason: string;
-  defaultAgentName: string;
-  defaultRole: string;
+  defaultAgentName: string;  // generic: 'agent-cursor', 'agent-claude', 'agent-codex'
 }
 
 export function isCommandInPath(command: string): boolean {
@@ -30,8 +29,7 @@ export function detectClients(projectRoot: string): DetectedClient[] {
     name: 'cursor',
     detected: cursorExists,
     reason: cursorExists ? '.cursor/ directory found' : '.cursor/ directory not found',
-    defaultAgentName: 'cursor-dev',
-    defaultRole: 'developer',
+    defaultAgentName: 'agent-cursor',
   });
 
   // Claude Code
@@ -40,8 +38,7 @@ export function detectClients(projectRoot: string): DetectedClient[] {
     name: 'claude-code',
     detected: claudeInPath,
     reason: claudeInPath ? 'claude binary in PATH' : 'claude binary not found in PATH',
-    defaultAgentName: 'claude-reviewer',
-    defaultRole: 'reviewer',
+    defaultAgentName: 'agent-claude',
   });
 
   // Codex CLI
@@ -58,8 +55,7 @@ export function detectClients(projectRoot: string): DetectedClient[] {
     reason: codexDetected
       ? codexReasons.join(', ')
       : '.codex/ directory not found and codex binary not found in PATH',
-    defaultAgentName: 'codex-tester',
-    defaultRole: 'tester',
+    defaultAgentName: 'agent-codex',
   });
 
   return clients;

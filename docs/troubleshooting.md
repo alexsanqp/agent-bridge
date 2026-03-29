@@ -7,11 +7,49 @@
 1. Run `agent-bridge doctor` to verify the setup.
 2. Check that the MCP config was generated for your client:
    - **Cursor:** `.cursor/mcp.json` in the project root
-   - **Claude Code:** `.claude/claude_desktop_config.json` or project-level config
-   - **Codex CLI:** `.codex/config.json`
+   - **Claude Code:** `.mcp.json` in the project root
+   - **Codex CLI:** `.codex/config.toml` in the project root
 3. Ensure the `agent-bridge` binary is on your `PATH`. Run `which agent-bridge`
    (or `where agent-bridge` on Windows) to confirm.
 4. Restart the AI client after running `agent-bridge init`.
+
+## peer_wait times out
+
+**Symptom:** `peer_wait` returns `timeout` before the other agent has had time to respond.
+
+Some clients enforce MCP call duration limits. Cursor may timeout MCP tool calls after 30-200 seconds, which is often shorter than the time needed for another agent to process a task and reply.
+
+**Solution:** Switch to autonomous mode and use `peer_check` for polling:
+
+1. Set `autonomy.mode: autonomous` in `.agent-bridge/config.yaml`
+2. Run `agent-bridge init` to regenerate instruction files
+3. Agents will now use `peer_check` (non-blocking) instead of `peer_wait` (blocking)
+
+## Agent does not check inbox automatically
+
+**Symptom:** An agent starts a session but does not process pending tasks from other agents unless you manually tell it to check.
+
+This happens in manual mode, where agents only use collaboration tools when the user explicitly requests it.
+
+**Solution:** Switch to autonomous mode:
+
+1. Set `autonomy.mode: autonomous` in `.agent-bridge/config.yaml`
+2. Run `agent-bridge init` to regenerate instruction files
+3. Restart the AI client session
+
+In autonomous mode, the generated instructions tell agents to call `peer_inbox` at session start and process any pending tasks before doing other work.
+
+## Role is wrong after init
+
+**Symptom:** An agent has the wrong role (e.g., shows as "developer" but should be "reviewer").
+
+Roles are stored in `.agent-bridge/config.yaml` under the `agents` section. The init command uses whatever was entered during the interactive prompt.
+
+**Solution:**
+
+1. Edit `.agent-bridge/config.yaml` and change the `role` field for the agent
+2. Run `agent-bridge init --force` to regenerate all instruction and role files
+3. Restart the AI client session to pick up the new instructions
 
 ## Stale database path after moving a project
 
@@ -51,7 +89,7 @@ resolve to the same file.
 ## Tasks expire unexpectedly
 
 Tasks have a configurable TTL set by `expiration_minutes` in the config
-(default: 60 minutes). Increase this value for long-running review tasks.
+(default: 30 minutes). Increase this value for long-running review tasks.
 
 ## Database locked errors
 
