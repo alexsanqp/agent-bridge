@@ -117,6 +117,63 @@ ${generateWorkflowSection(mode)}
 `;
 }
 
+export function generateSkill(
+  allAgents: AgentInfo[],
+  mode: 'manual' | 'autonomous',
+): string {
+  const peerList =
+    allAgents.length > 0
+      ? allAgents.map((p) => `- **${p.name}** — ${p.role} (${p.client})`).join('\n')
+      : '- No agents configured yet';
+
+  return `---
+name: peer-collaborate
+description: Peer collaboration with other AI agents via Agent Bridge. Use when collaborating, sending tasks, checking inbox, or reviewing code with peer agents.
+---
+
+# Agent Bridge — Peer Collaboration
+
+You are an AI agent in a peer collaboration environment.
+Call \`peer_status\` to check your agent name and role.
+
+## Peer Agents
+
+${peerList}
+
+## Available Tools
+
+You have access to these MCP tools for collaborating with other agents:
+
+- \`peer_send\` — Send a task to another agent
+- \`peer_inbox\` — Check for tasks assigned to you
+- \`peer_get_task\` — Read full task details
+- \`peer_reply\` — Reply to a task
+- \`peer_wait\` — Wait for a reply (blocks until response)
+- \`peer_complete\` — Mark a task done
+- \`peer_cancel\` — Cancel a task
+- \`peer_check\` — Quick poll for new activity on a task (lightweight)
+- \`peer_status\` — Check bridge status
+
+${generateWorkflowSection(mode)}
+`;
+}
+
+export function writeSkill(projectRoot: string, content: string): void {
+  const targets = [
+    path.join(projectRoot, '.agents', 'skills', 'peer-collaborate', 'SKILL.md'),
+    path.join(projectRoot, '.claude', 'skills', 'peer-collaborate', 'SKILL.md'),
+  ];
+
+  for (const target of targets) {
+    const dir = path.dirname(target);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(target, content, 'utf-8');
+  }
+}
+
+/** @deprecated Use generateSkill() instead. Kept for backward compatibility. */
 export function generateCursorRule(
   agentName: string,
   role: string,
@@ -161,6 +218,7 @@ ${generateWorkflowSection(mode)}
 `;
 }
 
+/** @deprecated Use generateSkill() instead. Kept for backward compatibility. */
 export function generateClaudeInstructions(
   agentName: string,
   role: string,
@@ -278,6 +336,7 @@ export function writeRolePrompt(
   fs.writeFileSync(path.join(agentsDir, `${agentName}.md`), content, 'utf-8');
 }
 
+/** @deprecated Use writeSkill() instead. Kept for backward compatibility. */
 export function writeCursorRule(projectRoot: string, content: string): void {
   const rulesDir = path.join(projectRoot, '.cursor', 'rules');
   if (!fs.existsSync(rulesDir)) {
@@ -287,7 +346,70 @@ export function writeCursorRule(projectRoot: string, content: string): void {
 }
 
 const CLAUDE_MD_SECTION_MARKER = '## Agent Bridge — Peer Collaboration';
+const CLAUDE_MD_POINTER_MARKER = '## Agent Bridge';
 
+export function writeClaudePointer(projectRoot: string): void {
+  const claudeMdPath = path.join(projectRoot, 'CLAUDE.md');
+  const pointer = `
+## Agent Bridge
+
+This project uses Agent Bridge for peer collaboration between AI agents.
+See \`.claude/skills/peer-collaborate/SKILL.md\` for instructions.
+Call \`peer_status\` to check your agent name and role.
+`;
+
+  let existing = '';
+  if (fs.existsSync(claudeMdPath)) {
+    existing = fs.readFileSync(claudeMdPath, 'utf-8');
+
+    // Replace old full Agent Bridge section if present
+    if (existing.includes(CLAUDE_MD_SECTION_MARKER)) {
+      const markerIndex = existing.indexOf(CLAUDE_MD_SECTION_MARKER);
+      const afterMarker = existing.substring(markerIndex + CLAUDE_MD_SECTION_MARKER.length);
+      const nextH2Match = afterMarker.match(/\n## (?!#)/);
+      if (nextH2Match && nextH2Match.index !== undefined) {
+        const before = existing.substring(0, markerIndex).trimEnd();
+        const after = existing.substring(markerIndex + CLAUDE_MD_SECTION_MARKER.length + nextH2Match.index);
+        fs.writeFileSync(claudeMdPath, before + '\n' + pointer + after, 'utf-8');
+      } else {
+        const before = existing.substring(0, markerIndex).trimEnd();
+        fs.writeFileSync(claudeMdPath, before + '\n' + pointer, 'utf-8');
+      }
+      return;
+    }
+
+    // Replace existing pointer section if present
+    if (existing.includes(CLAUDE_MD_POINTER_MARKER)) {
+      const markerIndex = existing.indexOf(CLAUDE_MD_POINTER_MARKER);
+      const afterMarker = existing.substring(markerIndex + CLAUDE_MD_POINTER_MARKER.length);
+      const nextH2Match = afterMarker.match(/\n## (?!#)/);
+      if (nextH2Match && nextH2Match.index !== undefined) {
+        const before = existing.substring(0, markerIndex).trimEnd();
+        const after = existing.substring(markerIndex + CLAUDE_MD_POINTER_MARKER.length + nextH2Match.index);
+        fs.writeFileSync(claudeMdPath, before + '\n' + pointer + after, 'utf-8');
+      } else {
+        const before = existing.substring(0, markerIndex).trimEnd();
+        fs.writeFileSync(claudeMdPath, before + '\n' + pointer, 'utf-8');
+      }
+      return;
+    }
+  }
+
+  // Append to existing or create new
+  const prefix = existing.length > 0 ? existing.trimEnd() + '\n' : '';
+  fs.writeFileSync(claudeMdPath, prefix + pointer, 'utf-8');
+}
+
+export function cleanupLegacyCursorRule(projectRoot: string): boolean {
+  const legacyPath = path.join(projectRoot, '.cursor', 'rules', 'agent-bridge.mdc');
+  if (fs.existsSync(legacyPath)) {
+    fs.unlinkSync(legacyPath);
+    return true;
+  }
+  return false;
+}
+
+/** @deprecated Use writeClaudePointer() instead. Kept for backward compatibility. */
 export function writeClaudeInstructions(
   projectRoot: string,
   content: string,

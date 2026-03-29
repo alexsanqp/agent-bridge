@@ -9,12 +9,12 @@ import {
   generateMcpConfig,
   generateRolePrompt,
   generateAgentsMd,
-  generateCursorRule,
-  generateClaudeInstructions,
+  generateSkill,
   writeMcpConfig,
   writeRolePrompt,
-  writeCursorRule,
-  writeClaudeInstructions,
+  writeSkill,
+  writeClaudePointer,
+  cleanupLegacyCursorRule,
 } from './generator.js';
 import { openDatabase, closeDatabase } from '../store/database.js';
 import { upsertAgent } from '../store/agents.js';
@@ -213,44 +213,24 @@ export async function runInit(opts: { force?: boolean; detect?: boolean; mode?: 
     console.log(`${mcpExists ? 'Updated' : 'Created'} MCP config for: ${client.name}`);
   }
 
-  // 9. Generate and write role prompts
-  for (const agent of agents) {
-    const roleContent = generateRolePrompt(agent.name, agent.role, agents, mode);
-    const promptPath = path.join(projectRoot, '.agents', `${agent.name}.md`);
-    if (fs.existsSync(promptPath) && !opts.force) {
-      console.log(`Skipped: ${promptPath} (already exists, use --force to overwrite)`);
-    } else {
-      const existed = fs.existsSync(promptPath);
-      writeRolePrompt(projectRoot, agent.name, roleContent);
-      console.log(`${existed ? 'Updated' : 'Created'} role prompt: .agents/${agent.name}.md`);
-    }
+  // 9. Generate and write unified skill to .agents/skills/ and .claude/skills/
+  const skillContent = generateSkill(agents, mode);
+  writeSkill(projectRoot, skillContent);
+  console.log('Created: .agents/skills/peer-collaborate/SKILL.md');
+  console.log('Created: .claude/skills/peer-collaborate/SKILL.md');
+
+  // 10. Write minimal CLAUDE.md pointer (idempotent)
+  writeClaudePointer(projectRoot);
+  const claudeMdPath = path.join(projectRoot, 'CLAUDE.md');
+  const claudeVerb = fs.existsSync(claudeMdPath) ? 'Updated' : 'Created';
+  console.log(`${claudeVerb}: CLAUDE.md (Agent Bridge pointer)`);
+
+  // 11. Clean up legacy .cursor/rules/agent-bridge.mdc if exists
+  if (cleanupLegacyCursorRule(projectRoot)) {
+    console.log('Removed legacy: .cursor/rules/agent-bridge.mdc');
   }
 
-  // 10. Generate and write client-specific instruction files
-  for (const client of detectedClients) {
-    const agent = agents.find((a) => a.client === client.name);
-    if (!agent) continue;
-
-    switch (client.name) {
-      case 'cursor': {
-        const cursorContent = generateCursorRule(agent.name, agent.role, agents, mode);
-        writeCursorRule(projectRoot, cursorContent);
-        console.log('Created: .cursor/rules/agent-bridge.mdc');
-        break;
-      }
-      case 'claude-code': {
-        const claudeContent = generateClaudeInstructions(agent.name, agent.role, agents, mode);
-        writeClaudeInstructions(projectRoot, claudeContent);
-        const claudeMdPath = path.join(projectRoot, 'CLAUDE.md');
-        const verb = fs.existsSync(claudeMdPath) ? 'Updated' : 'Created';
-        console.log(`${verb}: CLAUDE.md (Agent Bridge section)`);
-        break;
-      }
-      // codex: AGENTS.md is handled in step 11 below
-    }
-  }
-
-  // 11. Generate and write AGENTS.md (Codex reads this natively)
+  // 12. Generate and write AGENTS.md (Codex reads this natively)
   if (agents.length > 0) {
     const agentsMdContent = generateAgentsMd(agents, mode);
     const agentsMdPath = path.join(projectRoot, 'AGENTS.md');
@@ -264,23 +244,23 @@ export async function runInit(opts: { force?: boolean; detect?: boolean; mode?: 
     }
   }
 
-  // 12. Update .gitignore
+  // 13. Update .gitignore
   updateGitignore(projectRoot);
   console.log('Updated: .gitignore');
 
-  // 13. Open database (creates schema)
+  // 14. Open database (creates schema)
   const db = openDatabase(bridgeDir);
 
-  // 14. Register agents in DB
+  // 15. Register agents in DB
   for (const agent of agents) {
     upsertAgent(db, agent);
     console.log(`Registered agent: ${agent.name} (${agent.role})`);
   }
 
-  // 15. Close database
+  // 16. Close database
   closeDatabase(db);
 
-  // 16. Summary
+  // 17. Summary
   console.log('\n--- Init complete ---');
   console.log(`  Bridge dir: ${bridgeDir}`);
   console.log(`  Agents: ${agents.length > 0 ? agents.map((a) => a.name).join(', ') : '(none)'}`);

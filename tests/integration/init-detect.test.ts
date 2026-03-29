@@ -121,31 +121,71 @@ describe('init with cursor detected', () => {
     expect(content).not.toContain('\\');
   });
 
-  it('creates role prompt for detected client', async () => {
+  it('creates skill files in both .agents/skills/ and .claude/skills/', async () => {
     const root = setupCursorProject();
     originalCwd = process.cwd();
     process.chdir(root);
 
     await runInit({ force: true, detect: true });
 
-    const promptPath = path.join(root, '.agents', 'agent-cursor.md');
-    expect(fs.existsSync(promptPath)).toBe(true);
+    const agentsSkillPath = path.join(root, '.agents', 'skills', 'peer-collaborate', 'SKILL.md');
+    const claudeSkillPath = path.join(root, '.claude', 'skills', 'peer-collaborate', 'SKILL.md');
+
+    expect(fs.existsSync(agentsSkillPath)).toBe(true);
+    expect(fs.existsSync(claudeSkillPath)).toBe(true);
+
+    const agentsContent = fs.readFileSync(agentsSkillPath, 'utf-8');
+    const claudeContent = fs.readFileSync(claudeSkillPath, 'utf-8');
+    expect(agentsContent).toBe(claudeContent);
   });
 
-  it('role prompt contains correct format', async () => {
+  it('skill file contains frontmatter and tools', async () => {
     const root = setupCursorProject();
     originalCwd = process.cwd();
     process.chdir(root);
 
     await runInit({ force: true, detect: true });
 
-    const promptPath = path.join(root, '.agents', 'agent-cursor.md');
-    const content = fs.readFileSync(promptPath, 'utf-8');
+    const skillPath = path.join(root, '.agents', 'skills', 'peer-collaborate', 'SKILL.md');
+    const content = fs.readFileSync(skillPath, 'utf-8');
 
-    expect(content).toContain('# Role:');
+    expect(content).toContain('name: peer-collaborate');
     expect(content).toContain('peer_send');
     expect(content).toContain('peer_inbox');
-    expect(content).toContain('peer_reply');
+    expect(content).toContain('peer_status');
     expect(content).toContain('## Collaboration Mode: Manual');
+  });
+
+  it('CLAUDE.md gets a minimal pointer, not full instructions', async () => {
+    const root = setupCursorProject();
+    originalCwd = process.cwd();
+    process.chdir(root);
+
+    await runInit({ force: true, detect: true });
+
+    const claudeMdPath = path.join(root, 'CLAUDE.md');
+    expect(fs.existsSync(claudeMdPath)).toBe(true);
+
+    const content = fs.readFileSync(claudeMdPath, 'utf-8');
+    expect(content).toContain('## Agent Bridge');
+    expect(content).toContain('.claude/skills/peer-collaborate/SKILL.md');
+    // Should NOT contain full instructions
+    expect(content).not.toContain('## Agent Bridge — Peer Collaboration');
+    expect(content).not.toContain('peer_send');
+  });
+
+  it('cleans up legacy .cursor/rules/agent-bridge.mdc on re-init', async () => {
+    const root = setupCursorProject();
+    originalCwd = process.cwd();
+    process.chdir(root);
+
+    // Create legacy file
+    const legacyDir = path.join(root, '.cursor', 'rules');
+    fs.mkdirSync(legacyDir, { recursive: true });
+    fs.writeFileSync(path.join(legacyDir, 'agent-bridge.mdc'), 'old cursor rule', 'utf-8');
+
+    await runInit({ force: true, detect: true });
+
+    expect(fs.existsSync(path.join(legacyDir, 'agent-bridge.mdc'))).toBe(false);
   });
 });

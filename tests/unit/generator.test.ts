@@ -9,10 +9,14 @@ import {
   generateAgentsMd,
   generateCursorRule,
   generateClaudeInstructions,
+  generateSkill,
   writeMcpConfig,
   writeRolePrompt,
   writeCursorRule,
   writeClaudeInstructions,
+  writeSkill,
+  writeClaudePointer,
+  cleanupLegacyCursorRule,
 } from '../../src/init/generator.js';
 
 let tmpDir: string;
@@ -396,6 +400,172 @@ describe('writeClaudeInstructions', () => {
     expect(written).not.toContain('Old stuff');
     expect(written).toContain('## Other Section');
     expect(written).toContain('Keep this.');
+  });
+});
+
+describe('generateSkill', () => {
+  const agents = [
+    { name: 'agent-cursor', role: 'debugger', client: 'cursor' },
+    { name: 'agent-claude', role: 'architect-reviewer', client: 'claude-code' },
+    { name: 'agent-codex', role: 'tester-visual', client: 'codex' },
+  ];
+
+  it('contains YAML frontmatter with name and description', () => {
+    const skill = generateSkill(agents, 'manual');
+    expect(skill).toMatch(/^---\n/);
+    expect(skill).toContain('name: peer-collaborate');
+    expect(skill).toContain('description: Peer collaboration with other AI agents via Agent Bridge.');
+  });
+
+  it('does not hardcode agent identity — uses peer_status', () => {
+    const skill = generateSkill(agents, 'manual');
+    expect(skill).toContain('Call `peer_status` to check your agent name and role.');
+    expect(skill).not.toContain('You are agent "');
+    expect(skill).not.toContain('Your agent name is "');
+  });
+
+  it('lists all peer agents', () => {
+    const skill = generateSkill(agents, 'manual');
+    expect(skill).toContain('agent-cursor');
+    expect(skill).toContain('agent-claude');
+    expect(skill).toContain('agent-codex');
+  });
+
+  it('contains all 9 MCP tools', () => {
+    const skill = generateSkill(agents, 'manual');
+    expect(skill).toContain('peer_send');
+    expect(skill).toContain('peer_inbox');
+    expect(skill).toContain('peer_get_task');
+    expect(skill).toContain('peer_reply');
+    expect(skill).toContain('peer_wait');
+    expect(skill).toContain('peer_complete');
+    expect(skill).toContain('peer_cancel');
+    expect(skill).toContain('peer_check');
+    expect(skill).toContain('peer_status');
+  });
+
+  it('generates manual mode instructions', () => {
+    const skill = generateSkill(agents, 'manual');
+    expect(skill).toContain('## Collaboration Mode: Manual');
+  });
+
+  it('generates autonomous mode instructions', () => {
+    const skill = generateSkill(agents, 'autonomous');
+    expect(skill).toContain('## Collaboration Mode: Autonomous');
+    expect(skill).toContain('peer_check');
+    expect(skill).toContain('Do NOT use `peer_wait`');
+  });
+
+  it('does not contain MDC frontmatter (alwaysApply)', () => {
+    const skill = generateSkill(agents, 'manual');
+    expect(skill).not.toContain('alwaysApply');
+  });
+});
+
+describe('writeSkill', () => {
+  it('writes to both .agents/skills/ and .claude/skills/ directories', () => {
+    writeSkill(tmpDir, '# Test Skill');
+
+    const agentsSkillPath = path.join(tmpDir, '.agents', 'skills', 'peer-collaborate', 'SKILL.md');
+    const claudeSkillPath = path.join(tmpDir, '.claude', 'skills', 'peer-collaborate', 'SKILL.md');
+
+    expect(fs.existsSync(agentsSkillPath)).toBe(true);
+    expect(fs.existsSync(claudeSkillPath)).toBe(true);
+
+    expect(fs.readFileSync(agentsSkillPath, 'utf-8')).toBe('# Test Skill');
+    expect(fs.readFileSync(claudeSkillPath, 'utf-8')).toBe('# Test Skill');
+  });
+
+  it('creates nested directories if they do not exist', () => {
+    const agentsSkillDir = path.join(tmpDir, '.agents', 'skills', 'peer-collaborate');
+    const claudeSkillDir = path.join(tmpDir, '.claude', 'skills', 'peer-collaborate');
+
+    expect(fs.existsSync(agentsSkillDir)).toBe(false);
+    expect(fs.existsSync(claudeSkillDir)).toBe(false);
+
+    writeSkill(tmpDir, '# Test');
+
+    expect(fs.existsSync(agentsSkillDir)).toBe(true);
+    expect(fs.existsSync(claudeSkillDir)).toBe(true);
+  });
+
+  it('both files have identical content', () => {
+    const content = '---\nname: peer-collaborate\n---\n# Skill Content';
+    writeSkill(tmpDir, content);
+
+    const agentsContent = fs.readFileSync(
+      path.join(tmpDir, '.agents', 'skills', 'peer-collaborate', 'SKILL.md'), 'utf-8');
+    const claudeContent = fs.readFileSync(
+      path.join(tmpDir, '.claude', 'skills', 'peer-collaborate', 'SKILL.md'), 'utf-8');
+
+    expect(agentsContent).toBe(claudeContent);
+  });
+});
+
+describe('writeClaudePointer', () => {
+  it('creates CLAUDE.md with pointer if it does not exist', () => {
+    writeClaudePointer(tmpDir);
+
+    const claudeMdPath = path.join(tmpDir, 'CLAUDE.md');
+    expect(fs.existsSync(claudeMdPath)).toBe(true);
+
+    const content = fs.readFileSync(claudeMdPath, 'utf-8');
+    expect(content).toContain('## Agent Bridge');
+    expect(content).toContain('.claude/skills/peer-collaborate/SKILL.md');
+    expect(content).toContain('peer_status');
+  });
+
+  it('appends pointer to existing CLAUDE.md', () => {
+    const claudeMdPath = path.join(tmpDir, 'CLAUDE.md');
+    fs.writeFileSync(claudeMdPath, '# My Project\n\nSome content.\n', 'utf-8');
+
+    writeClaudePointer(tmpDir);
+
+    const content = fs.readFileSync(claudeMdPath, 'utf-8');
+    expect(content).toContain('# My Project');
+    expect(content).toContain('Some content.');
+    expect(content).toContain('## Agent Bridge');
+    expect(content).toContain('.claude/skills/peer-collaborate/SKILL.md');
+  });
+
+  it('replaces old full Agent Bridge section with pointer', () => {
+    const claudeMdPath = path.join(tmpDir, 'CLAUDE.md');
+    fs.writeFileSync(claudeMdPath, '# My Project\n\n## Agent Bridge — Peer Collaboration\n\nOld full instructions here\n\n### Tools\n\nBig list\n', 'utf-8');
+
+    writeClaudePointer(tmpDir);
+
+    const content = fs.readFileSync(claudeMdPath, 'utf-8');
+    expect(content).toContain('# My Project');
+    expect(content).not.toContain('Old full instructions');
+    expect(content).toContain('## Agent Bridge');
+    expect(content).toContain('.claude/skills/peer-collaborate/SKILL.md');
+  });
+
+  it('is idempotent — re-running replaces existing pointer', () => {
+    writeClaudePointer(tmpDir);
+    writeClaudePointer(tmpDir);
+
+    const content = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf-8');
+    const matches = content.match(/## Agent Bridge/g);
+    expect(matches).toHaveLength(1);
+  });
+});
+
+describe('cleanupLegacyCursorRule', () => {
+  it('removes .cursor/rules/agent-bridge.mdc if it exists', () => {
+    const rulesDir = path.join(tmpDir, '.cursor', 'rules');
+    fs.mkdirSync(rulesDir, { recursive: true });
+    fs.writeFileSync(path.join(rulesDir, 'agent-bridge.mdc'), 'old rule', 'utf-8');
+
+    const removed = cleanupLegacyCursorRule(tmpDir);
+
+    expect(removed).toBe(true);
+    expect(fs.existsSync(path.join(rulesDir, 'agent-bridge.mdc'))).toBe(false);
+  });
+
+  it('returns false if legacy file does not exist', () => {
+    const removed = cleanupLegacyCursorRule(tmpDir);
+    expect(removed).toBe(false);
   });
 });
 
